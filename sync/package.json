@@ -2,8 +2,13 @@
   "name": "qg-sync",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
-  "scripts": { "sync": "node sync.mjs" },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "sync": "node sync.mjs",
+    "postinstall": "node patch-pawnote.mjs"
+  },
   "dependencies": {
     "html-entities": "2.6.0",
     "pawnote": "1.6.2",

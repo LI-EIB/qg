@@ -1,7 +1,20 @@
 // Accès Pronote en LECTURE SEULE via la bibliothèque pawnote.
 // Rien n'est jamais envoyé ni modifié sur Pronote (pas de « fait », pas de message).
 // @ts-check
-import * as pronote from "pawnote";
+import * as pronote from "@blockshub/pawnote-lts"; // pawnote maintenu pour PRONOTE 2026
+import forge from "node-forge";
+
+/** Vérifie le code PIN avant de contacter Pronote (même déchiffrement que l'appli Pronote). */
+export function checkQrPin(qr, pin) {
+  const dec = (hex) => {
+    const key = forge.md.md5.create().update(forge.util.createBuffer(String(pin)).bytes()).digest();
+    const iv = forge.util.createBuffer().fillWithByte(0, 16);
+    const d = forge.cipher.createDecipher("AES-CBC", key); d.start({ iv }); d.update(forge.util.createBuffer(forge.util.binary.hex.decode(String(hex))));
+    return d.finish() ? d.output.bytes() : null;
+  };
+  const u = dec(qr.login), t = dec(qr.jeton);
+  return !!(u && t && /^[\x20-\x7e]{2,}$/.test(u) && t.length >= 8);
+}
 
 const iso = (d) => (d instanceof Date && !isNaN(+d) ? d.toISOString() : null);
 
@@ -16,10 +29,12 @@ export function isAuthError(e) {
  */
 export async function connect(o) {
   const session = pronote.createSessionHandle();
-  /** @type {import("pawnote").RefreshInformation} */
+  /** @type {import("@blockshub/pawnote-lts").RefreshInformation} */
   let refresh;
   if (o.qr && o.pin) {
     o.log("Connexion à Pronote avec le QR code…");
+    if (!checkQrPin(o.qr, o.pin)) throw Object.assign(new Error("Le code à 4 chiffres ne correspond pas à ce QR code"), { name: "BadCredentialsError", pin: true });
+    o.log("Code PIN vérifié : il correspond bien au QR code.");
     refresh = await pronote.loginQrCode(session, { deviceUUID: o.deviceUUID, pin: String(o.pin), qr: o.qr });
   } else if (o.refresh) {
     o.log("Connexion à Pronote avec le jeton enregistré…");
@@ -40,7 +55,7 @@ const att = (a) => ({ id: a.id, kind: a.kind === pronote.AttachmentKind.Link ? "
 
 /**
  * Tout ce qui est utile au QG, en données simples (JSON).
- * @param {import("pawnote").SessionHandle} session
+ * @param {import("@blockshub/pawnote-lts").SessionHandle} session
  * @param {{ from: Date, to: Date, ttFrom: Date, ttTo: Date, log: (s:string)=>void }} r
  */
 export async function fetchAll(session, r) {
@@ -98,7 +113,7 @@ export async function fetchAll(session, r) {
     const tt = await pronote.timetableFromIntervals(session, r.ttFrom, r.ttTo);
     pronote.parseTimetable(session, tt, { withCanceledClasses: true, withPlannedClasses: true, withSuperposedCanceledClasses: false });
     out.lessons = tt.classes.filter((c) => c.is === "lesson").map((c) => {
-      const l = /** @type {import("pawnote").TimetableClassLesson} */ (c);
+      const l = /** @type {import("@blockshub/pawnote-lts").TimetableClassLesson} */ (c);
       return { id: l.id, start: iso(l.startDate), end: iso(l.endDate), subject: l.subject ? l.subject.name : "", canceled: !!l.canceled, status: l.status || "", test: !!l.test, exempted: !!l.exempted, teachers: l.teacherNames || [], rooms: l.classrooms || [] };
     });
   });

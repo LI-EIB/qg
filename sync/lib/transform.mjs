@@ -49,9 +49,12 @@ export function transform(raw, base, files, seen, now) {
   const today = parisDate(now);
   const initial = !seen.ok;
   const ev = [];
+  // Une catégorie vue pour la première fois (ex. onglet qui s'ouvre) est enregistrée sans notification.
+  const fresh = {};
   const firstSeen = (kind, id, d) => {
+    if (!(kind in fresh)) fresh[kind] = initial || !seen[kind] || !Object.keys(seen[kind]).length;
     const m = (seen[kind] = seen[kind] || {});
-    if (!m[id]) { m[id] = initial ? (d || today) : today; return !initial; }
+    if (!m[id]) { m[id] = fresh[kind] ? (d || today) : today; return !fresh[kind]; }
     return false;
   };
   const isNew = (kind, id) => (seen[kind] && seen[kind][id] ? seen[kind][id] >= addDays(today, -6) && seen[kind][id] !== "init" : false);

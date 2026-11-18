@@ -75,7 +75,7 @@ export async function fetchAll(session, r) {
     assignments: [], resources: [], grades: [], averages: [], overall: null, lessons: [], news: [], errors,
   };
 
-  if (has(pronote.TabLocation.Assignments)) await step("travail à faire", async () => {
+  await step("travail à faire", async () => {
     const list = await pronote.assignmentsFromIntervals(session, r.from, r.to);
     out.assignments = list.map((a) => ({
       id: a.id, subject: a.subject.name, description: a.description, deadline: iso(a.deadline), done: !!a.done,
@@ -83,7 +83,7 @@ export async function fetchAll(session, r) {
     }));
   });
 
-  if (has(pronote.TabLocation.Resources)) await step("cahier de textes", async () => {
+  await step("cahier de textes", async () => {
     const list = await pronote.resourcesFromIntervals(session, r.from, r.to);
     out.resources = list.map((x) => ({
       id: x.id, start: iso(x.startDate), end: iso(x.endDate), subject: x.subject.name, teachers: x.teachers || [],
@@ -109,7 +109,7 @@ export async function fetchAll(session, r) {
     }
   });
 
-  if (has(pronote.TabLocation.Timetable)) await step("emploi du temps", async () => {
+  await step("emploi du temps", async () => {
     const tt = await pronote.timetableFromIntervals(session, r.ttFrom, r.ttTo);
     pronote.parseTimetable(session, tt, { withCanceledClasses: true, withPlannedClasses: true, withSuperposedCanceledClasses: false });
     out.lessons = tt.classes.filter((c) => c.is === "lesson").map((c) => {
@@ -118,7 +118,7 @@ export async function fetchAll(session, r) {
     });
   });
 
-  if (has(pronote.TabLocation.News)) await step("informations", async () => {
+  await step("informations", async () => {
     const n = await pronote.news(session);
     out.news = n.items.map((x) => ({
       id: x.id, is: x.is, title: x.title || "", author: x.author || "", date: iso(x.startDate || x.creationDate), category: x.category ? x.category.name : "",

@@ -47,6 +47,19 @@ const qrReq = apply(box.msgs, state, Date.now());
 state.ntfySince = box.last || state.ntfySince;
 log(`Boîte aux lettres : ${box.msgs.length} message(s), ${state.subs.length} appareil(s) abonné(s)`);
 
+// ---------- diagnostic d'accès à Pronote (sans identifiant, rien de personnel dans le journal) ----------
+async function diagPronote(base, label) {
+  try {
+    const b = String(base || "").replace(/\/[^/]*$/, "");
+    for (const kind of ["eleve", "parent"]) {
+      const u = new URL(`${b}/mobile.${kind}.html`); u.searchParams.set("fd", "1"); u.searchParams.set("login", "true");
+      const r = await fetch(u, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 PRONOTE Mobile APP Version/2.0.11", Cookie: "appliMobile=1" } });
+      const t = r.status >= 300 && r.status < 400 ? "" : await r.text();
+      const loc = r.headers.get("location"); let lh = ""; try { lh = loc ? new URL(loc, u).host + new URL(loc, u).pathname : ""; } catch {}
+      log(`Diagnostic ${label} ${kind} : HTTP ${r.status}${lh ? " -> " + lh : ""}, ${t.length} car., version ${/>PRONOTE \d+\.\d+\.\d+/.test(t) ? "ok" : "absente"}, Start ${t.includes("Start (") ? "ok" : "absent"}${/IP/.test(t) && /suspendue|bloqu|refus/i.test(t) ? ", IP refusée" : ""}${/n'est pas disponible|indisponible/i.test(t) ? ", site indisponible" : ""} ; titre « ${(t.match(/<title>([^<]{0,90})/) || [])[1] || ""} »`);
+    }
+  } catch (e) { log(`Diagnostic ${label} : ${e.message}`); }
+}
 // ---------- Pronote ----------
 let session = null, raw = null, syncErr = "", needsQr = false;
 try {
@@ -57,9 +70,11 @@ try {
   await saveState(); // le jeton change à chaque connexion : on l'enregistre tout de suite
 } catch (e) {
   syncErr = e.message || String(e);
-  if (e.setup) log(syncErr);
+  if (e.setup) { log(syncErr); await diagPronote(base.PRONOTE, "adresse du QG"); }
   else {
     log("⚠ Connexion Pronote : " + (e.stack || e));
+    await diagPronote(base.PRONOTE, "adresse du QG");
+    if (qrReq && qrReq.qr && qrReq.qr.url) { const q = String(qrReq.qr.url); log(`QR code : adresse ${q.replace(/^https?:\/\//, "").replace(/\?.*$/, "")}`); await diagPronote(q, "adresse du QR code"); }
     if (qrReq) { state.lastQr = qrReq.id; needsQr = !state.refresh; syncErr = "La connexion par QR code a échoué (code PIN faux ou QR code expiré). Recommence l'étape « Connecter Pronote ». Détail : " + syncErr; }
     else if (P.isAuthError(e)) { state.authFails = (state.authFails || 0) + 1; if (state.authFails >= 2) { needsQr = true; state.needsQr = true; } }
   }

@@ -1,0 +1,61 @@
+# Robot du QG : lit Pronote (lecture seule), met à jour l'appli et envoie les notifications.
+name: QG
+on:
+  schedule:
+    - cron: "*/30 5-21 * * *"   # toutes les 30 min de 6h à 23h (heure de Paris)
+  workflow_dispatch:            # bouton « Run workflow » : synchro immédiate (ex. après le QR code)
+  push:
+    branches: [main]
+    paths: ["qg-app.zip", ".github/workflows/qg.yml"]
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: qg
+  cancel-in-progress: false
+jobs:
+  synchro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer une nouvelle version du QG (si qg-app.zip a été déposé)
+        if: hashFiles('qg-app.zip') != ''
+        run: |
+          unzip -o -q qg-app.zip
+          git rm -q --cached qg-app.zip && rm qg-app.zip
+          git config user.name "qg-robot" && git config user.email "qg-robot@users.noreply.github.com"
+          git add -A && git commit -q -m "Installation du QG" && git push -q
+      - name: Garder le robot actif (GitHub arrête les robots sans activité depuis 60 jours)
+        run: |
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt 3456000 ]; then
+            git config user.name "qg-robot" && git config user.email "qg-robot@users.noreply.github.com"
+            git commit -q --allow-empty -m "Robot actif" && git push -q
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sync/package-lock.json
+      - run: npm ci --omit=dev --no-audit --no-fund
+        working-directory: sync
+      - name: Récupérer l'état chiffré du robot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/state.sh load
+      - name: Synchro Pronote
+        env:
+          QG_KEY: ${{ secrets.QG_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          QG_SAVE_CMD: bash tools/state.sh save
+        run: node sync/sync.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

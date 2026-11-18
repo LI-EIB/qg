@@ -1,0 +1,12 @@
+{
+  "name": "qg-sync",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "sync": "node sync.mjs" },
+  "dependencies": {
+    "html-entities": "2.6.0",
+    "pawnote": "1.6.2",
+    "web-push": "3.6.7"
+  }
+}

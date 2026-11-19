@@ -33,8 +33,13 @@ export function dailyMessages({ now, state, content, base, name }) {
   const sent = (state.sent = state.sent || {});
   for (const k of Object.keys(sent)) if (k.slice(-10) < addDays(today, -10)) delete sent[k];
   const mission = (base.MISSIONS || []).find((m) => m.date === today) || (content.missions || []).find((m) => m.date === today);
-  const tomorrow = addDays(today, 1);
-  const dev = (content.devoirs || []).filter((d) => d.due === tomorrow && !d.done);
+  // Devoirs du soir = ceux du prochain jour de classe (rien le vendredi : ceux de lundi sont pour le week-end)
+  const hol = (d) => (content.holidays || base.HOLIDAYS || []).some((h) => d >= h.start && d <= h.end);
+  let tomorrow = addDays(today, 1);
+  while ([0, 6].includes(new Date(tomorrow + "T12:00:00Z").getUTCDay()) || hol(tomorrow)) tomorrow = addDays(tomorrow, 1);
+  const friday = new Date(today + "T12:00:00Z").getUTCDay() === 5;
+  const dev = friday ? [] : (content.devoirs || []).filter((d) => d.due === tomorrow && !d.done);
+  const pour = tomorrow === addDays(today, 1) ? "pour demain" : "pour " + frDay(tomorrow);
   const boss = [...(base.BOSSES || []), ...(content.bosses || []).filter((b) => b.auto)].filter((b) => b.date && b.date > today && b.date <= addDays(today, 2));
   const quiet = p.h >= 22 || p.h < 7;
   if (quiet) return out;
@@ -42,9 +47,9 @@ export function dailyMessages({ now, state, content, base, name }) {
   if (p.h * 60 + p.m >= 17 * 60 && !sent["rem-" + today] && (mission || dev.length)) {
     sent["rem-" + today] = 1;
     const parts = [];
-    if (dev.length) parts.push(`${dev.length} devoir${dev.length > 1 ? "s" : ""} pour demain`);
+    if (dev.length) parts.push(`d'abord ${dev.length} devoir${dev.length > 1 ? "s" : ""} ${pour}`);
     if (boss.length) parts.push(`boss ${boss.map((b) => b.title).join(", ")} ${boss[0].date === tomorrow ? "demain" : "après-demain"}`);
-    out.push({ to: ["lehna"], tag: "rappel", title: mission ? `Mission du soir : ${cut(mission.title, 70)}` : "Les devoirs pour demain", body: (parts.join(" · ") || "Ouvre le QG pour la voir") + (mission ? ` · +${mission.xp || 10} XP` : ""), url: "#aujourdhui" });
+    out.push({ to: ["lehna"], tag: "rappel", title: mission ? `Mission du soir : ${cut(mission.title, 70)}` : `Les devoirs ${pour}`, body: (parts.join(" · ") || "Ouvre le QG pour la voir") + (mission ? ` · +${mission.xp || 10} XP` : ""), url: "#aujourdhui" });
   }
 
   if (p.h * 60 + p.m >= 20 * 60 + 30 && !sent["par-" + today]) {
@@ -52,13 +57,13 @@ export function dailyMessages({ now, state, content, base, name }) {
     const prog = state.progress;
     const seenToday = prog && prog.at && parisParts(prog.at).date === today;
     let title, body;
-    if (!seenToday) { title = `${name} n'a pas encore ouvert le QG aujourd'hui`; body = mission ? `Mission du soir : ${cut(mission.title, 90)}` : `${dev.length} devoir(s) pour demain`; }
+    if (!seenToday) { title = `${name} n'a pas encore ouvert le QG aujourd'hui`; body = mission ? `Mission du soir : ${cut(mission.title, 90)}` : `${dev.length} devoir(s) ${pour}`; }
     else {
       const p2 = prog.p || {}; const done = mission && p2.done && p2.done[today];
       const keys = dev.map((d) => d.due + ":" + d.subj + ":" + d.text.slice(0, 24));
       const devDone = keys.filter((k) => p2.devoirs && p2.devoirs[k]).length;
       title = mission ? (done ? `${name} a fini sa mission du soir` : `${name} n'a pas encore validé sa mission du soir`) : `Bilan du soir de ${name}`;
-      body = `${dev.length ? `Devoirs pour demain cochés : ${devDone}/${dev.length}` : "Pas de devoir pour demain"}${boss.length ? ` · boss proche : ${boss[0].title}` : ""}`;
+      body = `${dev.length ? `Devoirs ${pour} cochés : ${devDone}/${dev.length}` : `Pas de devoir ${pour}`}${boss.length ? ` · boss proche : ${boss[0].title}` : ""}`;
     }
     out.push({ to: ["parent"], tag: "bilan", title, body, url: "#suivi" });
   }

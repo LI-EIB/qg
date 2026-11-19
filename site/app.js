@@ -82,6 +82,7 @@ function missionCard(m,big){
       <div class="row"><span class="eyebrow">${big?"Mission du soir · ":""}${fmtLong(m.date)}</span>${b?`<span class="pill boss">BOSS ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : prête pour ${esc(r.title)}</span>`:""}</div>
       <div class="row">${chip(m.subj)}<span class="pill">${m.date.slice(5)>="12-14"?"20 min":(dObj(m.date).getDay()%6===0?"1h30":"30 à 45 min")}</span><span class="pill">+${m.xp} XP</span></div>
       ${big?`<h2>${esc(m.title)}</h2>`:`<h3 style="font-size:20px">${esc(m.title)}</h3>`}
+      ${devoirsBlock(m.date)}
       <div class="where"><b>Où travailler :</b> ${esc(m.where)}${links(m.go)}</div>
       <div class="row"><button class="btn ${done?"done":""}" data-done="${m.date}">${done?"✓ Mission accomplie":"J'ai fini ma mission"}</button>
       ${SUBJ[m.subj]&&FICHES[m.subj]?`<a class="btn ghost" href="#fiches/${m.subj}">Ouvrir la fiche</a>`:""}</div>
@@ -94,7 +95,7 @@ function vAujourdhui(){
     const hol=holidayOf(TODAY);
     hero = hol
       ? `<div class="card mission" style="${sc("autre")}"><div class="eyebrow">Vacances</div><h2>${esc(hol.n||"Vacances")} : bravo, profite !</h2><p class="muted">Retour en classe après le ${fmtLong(hol.end)}.${TODAY>"2026-12-18"&&TODAY<"2027-01-04"?" Une seule chose pendant ces vacances : commencer Brooklyn de Colm Tóibín (à lire pour le 1er février).":""}</p></div>`
-      : `<div class="card mission" style="${sc("autre")}"><div class="eyebrow">${fmtLong(TODAY)}</div><h2>Pas de mission prévue aujourd'hui</h2><p class="muted">Profite pour rattraper une mission ratée dans le <a href="#planning">planning</a>.</p></div>`;
+      : `<div class="card mission" style="${sc("autre")}"><div class="eyebrow">${fmtLong(TODAY)}</div><h2>Pas de mission prévue aujourd'hui</h2><p class="muted">Profite pour rattraper une mission ratée dans le <a href="#planning">planning</a>.</p>${devoirsBlock(TODAY)}</div>`;
   } else hero=missionCard(m,true);
   const nb=nextBoss();
   let bossCard="";
@@ -127,7 +128,7 @@ function vAujourdhui(){
 }
 let selDay=null;
 function vPlanning(){
-  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour de boss · « prête ! » = objectif atteint 2 jours avant. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
+  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour de boss · « prête ! » = objectif atteint 2 jours avant. Chaque case montre la mission et les devoirs Pronote à faire ce soir-là pour le lendemain. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
   ["LUN","MAR","MER","JEU","VEN","SAM","DIM"].forEach(h=>html+=`<div class="hd">${h}</div>`);
   for(let w=0;w<5;w++){
     html+=`<div class="weekhead">Semaine ${w+1}</div>`;
@@ -135,7 +136,7 @@ function vPlanning(){
       if(!m){html+=`<div class="day empty" style="${sc("autre")}"><span class="d">${fmt(s)}</span><span class="s">${holidayOf(s)?"Vacances":"Libre"}</span></div>`;continue;}
       const b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
       html+=`<button class="day ${b?"isboss":""} ${s===TODAY?"today":""} ${state.done[s]?"done":""} ${s<TODAY?"past":""} ${s===(selDay||TODAY)?"sel":""}" style="${sc(m.subj)}" data-day="${s}" aria-label="${fmtLong(s)} : ${esc(m.title)}">
-        <span class="d">${fmt(s)}</span>${b?`<span class="tag">BOSS ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span></button>`;}
+        <span class="d">${fmt(s)}</span>${b?`<span class="tag">BOSS ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span>${(()=>{const n=devoirsSoir(s).list.length; return n?`<span class="dv">+ ${n} devoir${n>1?"s":""} pour ${fmt(nextClassDay(s)).split(" ")[0]}</span>`:"";})()}</button>`;}
   }
   html+=`</div>`;
   const m=MISSIONS.find(x=>x.date===(selDay||TODAY))||MISSIONS.find(x=>x.date>=TODAY);
@@ -355,6 +356,21 @@ async function refreshLatest(manual){
     if(sig!==lastSig){const fresh=lastSig&&c.updatedAt&&(!LATEST||c.updatedAt!==LATEST.updatedAt); lastSig=sig; applyContent(c); rerender(); if(fresh) toast("Nouveautés Pronote chargées");}
     else if(manual) toast("Déjà à jour");}
   catch(e){if(manual) toast("Pas de connexion pour l'instant");}
+}
+
+
+/* ============ DEVOIRS DU SOIR DANS LE PLANNING ============ */
+/* Le soir, on fait d'abord les devoirs du prochain jour de classe, puis la mission.
+   Vendredi : rien (les devoirs de lundi sont prévus le week-end). */
+function nextClassDay(d){const x=dObj(d); do{x.setDate(x.getDate()+1);}while(x.getDay()===0||x.getDay()===6||holidayOf(iso(x))); return iso(x);}
+function devoirsSoir(d){if(dObj(d).getDay()===5) return {next:null,list:[]}; const n=nextClassDay(d); return {next:n,list:DEVOIRS.filter(x=>x.due===n)};}
+const devKey=d=>d.due+":"+d.subj+":"+d.text.slice(0,24);
+function devoirsBlock(d){
+  const {next,list}=devoirsSoir(d); if(!list.length) return "";
+  const done=list.filter(x=>state.devoirs[devKey(x)]||x.done).length;
+  return `<div class="tonight"><div class="row" style="justify-content:space-between"><b>1. D'abord, les devoirs pour ${fmtLong(next)}</b><span class="pill ${done===list.length?"good":"warn"}">${done}/${list.length} faits</span></div>
+  <ul class="list dev" style="margin-top:8px">${list.map(x=>{const k=devKey(x), ok=!!state.devoirs[k]||!!x.done; return `<li class="${ok?"ok":""}"><input type="checkbox" aria-label="Devoir fait" data-dev="${esc(k)}" ${ok?"checked":""}><div style="min-width:0">${chip(x.subj)}<div class="txt" style="margin-top:4px">${esc(x.text)}</div>${links(x.go)}</div></li>`;}).join("")}</ul>
+  <p class="muted" style="margin:8px 0 0;font-size:13px"><b>2. Ensuite, la mission ci-dessous.</b></p></div>`;
 }
 
 /* ============ CARTES SUPPLÉMENTAIRES (Aujourd'hui) ============ */

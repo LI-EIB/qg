@@ -645,7 +645,7 @@ function sacCard(){
   if(!L.length) return `<div class="card"><div class="eyebrow">Mon sac pour ${fmtLong(d)}</div><p class="muted" style="margin:8px 0 0">L'emploi du temps de ce jour n'est pas encore sur Pronote.</p></div>`;
   const subs=[...new Set(L.filter(l=>!l.x).map(l=>l.s))];
   const dev=DEVOIRS.filter(x=>x.due===d), ev=BOSSES.filter(b=>b.date===d);
-  const items=subs.map(s=>s==="eps"?"Tenue de sport et baskets (EPS)":`Cahier et livre de ${SUBJ[s]?SUBJ[s].n.split(" (")[0]:s}`)
+  const items=subs.map(s=>s==="eps"?"Tenue de sport et baskets (EPS)":(n=>`Cahier et livre ${/^[AEIOUHÉÈ]/i.test(n)?"d'":"de "}${n}`)(SUBJ[s]?SUBJ[s].n.split(" (")[0]:s))
     .concat(dev.filter(x=>/rendre|imprim|apporter|feuille|copie|dm\b|devoir maison/i.test(x.text)).map(x=>`À rendre en ${SUBJ[x.subj]?SUBJ[x.subj].n.split(" (")[0]:x.subj} : ${x.text.slice(0,70)}`))
     .concat(["Trousse complète, agenda, gourde"]);
   return `<div class="card"><div class="eyebrow">Mon emploi du temps et mon sac pour ${fmtLong(d)}</div>

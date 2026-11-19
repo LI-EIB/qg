@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-v="ffcc0e1c25">
+<html lang="fr" data-v="164b7855e7">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -291,6 +291,23 @@ kbd{font:inherit;font-size:.85em;padding:1px 6px;border:1px solid var(--line);bo
 .s-mtitle{margin:0;font-weight:800;font-size:16px}
 .s-mission .where{margin:0}
 .s-link{font-size:13px;margin-left:28px}
+.searchbar{margin:2px 0 8px}
+.searchbar input{width:100%;font:inherit;font-size:15px;padding:10px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink)}
+.searchbar input:focus{outline:2px solid var(--accent);outline-offset:1px}
+mark{background:#ffe27a;color:#111;border-radius:3px;padding:0 1px}
+.sres li .muted{font-size:13px;margin-top:3px}
+.rubis{width:11px;height:18px;vertical-align:-3px;margin-right:4px}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+.badge{border:1px dashed var(--line);border-radius:12px;padding:8px 10px;opacity:.55;display:grid;gap:2px}
+.badge.on{border-style:solid;border-color:#d4a017;background:color-mix(in srgb,#ffd54a 18%,var(--surface));opacity:1}
+.badge span{font-size:12px;color:var(--ink-2)}
+.qq{font-size:22px;margin:0 0 12px}
+.qopts{display:grid;gap:8px}
+.qopt{font:inherit;text-align:left;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-weight:700}
+.qopt:hover:not(:disabled){border-color:var(--sc)}
+.qopt.good{border-color:var(--good);background:color-mix(in srgb,var(--good) 15%,var(--surface))}
+.qopt.bad{border-color:var(--boss);background:color-mix(in srgb,var(--boss) 12%,var(--surface))}
+.list.edt li.ko{opacity:.55;text-decoration:line-through}
 
 </style>
 </head>
@@ -305,17 +322,18 @@ kbd{font:inherit;font-size:.85em;padding:1px 6px;border:1px solid var(--line);bo
     </div>
     <span class="streak" id="streak" title="Série : jours de suite avec la mission faite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 3.5-1.5 5-1.5 8 0 1.4 1 2.5 2.3 2.5 1.6 0 2.4-1.4 2.2-3.2C17.6 11 19 13.3 19 15.6 19 19.7 15.9 22 12 22s-7-2.4-7-6.4C5 10.3 10.6 7.4 12 2z"/></svg><span id="streaknum">0 jour</span></span>
     <div class="xpbox" title="Points d'expérience">
-      <div class="xpbar" role="progressbar" aria-label="XP" aria-valuemin="0" aria-valuemax="450" id="xpbar"><i id="xpfill" style="width:0"></i></div>
-      <span class="xpnum" id="xpnum">0 XP</span>
+      <div class="xpbar" role="progressbar" aria-label="Rubis" aria-valuemin="0" aria-valuemax="600" id="xpbar"><i id="xpfill" style="width:0"></i></div>
+      <span class="xpnum" id="xpnum">0 rubis</span>
     </div>
   </div>
   <div class="wrap">
+    <div class="searchbar"><input id="q" type="search" placeholder="Rechercher un cours, un document, une notion… (touche /)" aria-label="Rechercher dans le QG" autocomplete="off"></div>
     <nav class="tabs" aria-label="Sections">
       <a href="#aujourdhui" data-v="aujourdhui">Aujourd'hui</a>
       <a href="#planning" data-v="planning">Planning</a>
       <a href="#boss" data-v="boss">Évaluations</a>
       <a href="#fiches" data-v="fiches">Fiches & PDF</a>
-      <a href="#cartes" data-v="cartes">Cartes mémoire</a>
+      <a href="#cartes" data-v="cartes">Cartes & quiz</a>
       <a href="#exercices" data-v="exercices">Exercices</a>
       <a href="#notes" data-v="notes">Mes notes</a>
       <a href="#suivi" data-v="suivi">Suivi</a>
@@ -333,10 +351,12 @@ kbd{font:inherit;font-size:.85em;padding:1px 6px;border:1px solid var(--line);bo
   <section class="view" id="v-exercices" hidden></section>
   <section class="view" id="v-notes" hidden></section>
   <section class="view" id="v-suivi" hidden></section>
+  <section class="view" id="v-quiz" hidden></section>
+  <section class="view" id="v-recherche" hidden></section>
   <section class="view" id="v-reglages" hidden></section>
   <div class="foot"><span class="sync" id="sync">Progrès enregistrés sur cet appareil</span><span id="upd"></span></div>
 </main>
 </div>
-<script src="boot.js?v=ffcc0e1c25"></script>
+<script src="boot.js?v=164b7855e7"></script>
 </body>
 </html>

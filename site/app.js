@@ -1,7 +1,7 @@
 /* ============ ÉTAT ============ */
 /* Progrès gardés sur cet ordinateur + copie chiffrée envoyée au robot (pour le suivi parent et la sauvegarde). */
 const KEY="qg-lehna-v1"; const ROLE=QG.role;
-let state={done:{},checks:{},cards:{},devoirs:{}};
+let state={done:{},checks:{},cards:{},devoirs:{},srs:{},quiz:{}};
 try{const s=JSON.parse(QG.LS.get(KEY)||"null"); if(s&&s.done) state={...state,...s};}catch(e){}
 let LATEST=null, pushTimer=null, lastPushed=QG.LS.get("qg-pushed")||"";
 function save(){
@@ -11,7 +11,7 @@ function save(){
 }
 async function pushProgress(keep,force){
   clearTimeout(pushTimer); if(ROLE==="parent"||!QG.keys) return;
-  const p={done:state.done,checks:state.checks,cards:state.cards,devoirs:state.devoirs}; const j=JSON.stringify(p);
+  const p={done:state.done,checks:state.checks,cards:state.cards,devoirs:state.devoirs,srs:state.srs,quiz:state.quiz}; const j=JSON.stringify(p);
   if(j===lastPushed&&!force) return;
   try{await QG.post({t:"prog",p,at:Date.now()},keep); lastPushed=j; QG.LS.set("qg-pushed",j); QG.LS.set("qg-pushday",iso(new Date()));}catch(e){}
 }
@@ -35,8 +35,8 @@ const diff=(a,b)=>Math.round((dObj(b)-dObj(a))/864e5);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const chip=s=>`<span class="chip" style="${sc(s)}">${SUBJ[s]?SUBJ[s].n:esc(s)}</span>`;
 const bossById=id=>BOSSES.find(b=>b.id===id);
-const xp=()=>MISSIONS.reduce((t,m)=>t+(state.done[m.date]?m.xp:0),0);
-const LEVELS=[150,300,450];
+const xp=()=>MISSIONS.reduce((t,m)=>t+(state.done[m.date]?m.xp:0),0)+quizRubis();
+const LEVELS=[150,300,450,600];
 
 /* ============ LIENS ============ */
 const KIND={pdf:"PDF",mp3:"AUDIO",m4a:"AUDIO",wav:"AUDIO",docx:"WORD",doc:"WORD",odt:"WORD",pptx:"PPT",xlsx:"EXCEL",png:"IMAGE",jpg:"IMAGE",jpeg:"IMAGE"};
@@ -51,6 +51,7 @@ function lk(spec){
   if(t==="cartes"&&CARDS[p[1]]) return `<a class="lk int" href="#cartes/${p[1]}" style="${sc(p[1])}"><span class="ic">CARTES</span><span>${esc(label||"Cartes mémoire "+SUBJ[p[1]].n.split(" (")[0])}</span></a>`;
   if(t==="file"){const f=(LATEST&&LATEST.files||{})[p[1]]; const e=String((f&&f.e)||"doc"); return `<a class="lk doc" href="#" data-file="${esc(p[1])}"><span class="ic">${KIND[e]||e.toUpperCase().slice(0,5)}</span><span>${esc(label||(f&&f.n)||"Document")}</span></a>`;}
   if(t==="href"){const u=main.slice(5); if(!/^https?:\/\//i.test(u)) return ""; return `<a class="lk ext" href="${esc(u)}" target="_blank" rel="noopener"><span class="ic">WEB</span><span>${esc(label||u)}</span></a>`;}
+  if(t==="quiz"&&CARDS[p[1]]) return `<a class="lk int" href="#quiz/${p[1]}" style="${sc(p[1])}"><span class="ic">QUIZ</span><span>${esc(label||"Quiz "+SUBJ[p[1]].n.split(" (")[0])}</span></a>`;
   if(t==="url"&&EXT[p[1]]) return `<a class="lk ext" href="${EXT[p[1]][0]}" target="_blank" rel="noopener"><span class="ic">WEB</span><span>${esc(label||EXT[p[1]][1])}</span></a>`;
   return "";
 }
@@ -64,8 +65,8 @@ function streak(){
 }
 function renderXP(){
   const st=streak(); document.getElementById("streaknum").textContent=st+(st>1?" jours":" jour");
-  const v=xp(); document.getElementById("xpnum").textContent=v+" XP";
-  document.getElementById("xpfill").style.width=Math.min(100,v/450*100)+"%";
+  const v=xp(); document.getElementById("xpnum").innerHTML=RUBIS_SVG+v+" rubis";
+  document.getElementById("xpfill").style.width=Math.min(100,v/600*100)+"%";
   document.getElementById("xpbar").setAttribute("aria-valuenow",v);
 }
 function currentMission(){
@@ -80,7 +81,7 @@ function missionCard(m,big){
   const done=!!state.done[m.date], b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
   return `<div class="card mission ${big?"":"detail"}" style="${sc(m.subj)}">
       <div class="row"><span class="eyebrow">${big?"Mission du soir · ":""}${fmtLong(m.date)}</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : prête pour ${esc(r.title)}</span>`:""}</div>
-      <div class="row">${chip(m.subj)}<span class="pill">${m.date.slice(5)>="12-14"?"20 min":(dObj(m.date).getDay()%6===0?"1h30":"30 à 45 min")}</span><span class="pill">+${m.xp} XP</span></div>
+      <div class="row">${chip(m.subj)}<span class="pill">${m.date.slice(5)>="12-14"?"20 min":(dObj(m.date).getDay()%6===0?"1h30":"30 à 45 min")}</span><span class="pill">+${m.xp} rubis</span></div>
       ${big?`<h2>${esc(m.title)}</h2>`:`<h3 style="font-size:20px">${esc(m.title)}</h3>`}
       ${devoirsBlock(m.date)}
       <div class="where"><b>Où travailler :</b> ${esc(m.where)}${links(m.go)}</div>
@@ -96,14 +97,14 @@ function vAujourdhui(){
   const dev=DEVOIRS.filter(d=>d.due>=TODAY).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,14)
     .map(d=>{const k=devKey(d); const ok=!!state.devoirs[k]||!!d.done;
       return `<li class="${ok?"ok":""}"><input type="checkbox" aria-label="Devoir fait" data-dev="${esc(k)}" ${ok?"checked":""}><span class="date">${fmt(d.due)}</span><div style="min-width:0">${chip(d.subj)}<div class="txt" style="margin-top:4px">${esc(d.text)}</div>${links(d.go)}</div></li>`;}).join("")||`<li>Aucun devoir à venir enregistré.</li>`;
-  const rewards=LEVELS.map((l,i)=>`<div class="reward ${v>=l?"won":""}"><b>${l} XP</b>${v>=l?"Débloquée !":"Récompense "+(i+1)}</div>`).join("");
-  return `<div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">${statusCard()}${soirCard(TODAY,true)}</div>
+  const rewards=LEVELS.map((l,i)=>`<div class="reward ${v>=l?"won":""}"><b>${COUPES[i]}</b>${l} rubis · ${v>=l?"débloquée !":"récompense "+(i+1)}</div>`).join("");
+  return `<div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">${statusCard()}${soirCard(TODAY,true)}${sacCard()}</div>
    <div style="display:grid;gap:18px;align-content:start;min-width:0">
     ${evalsCard()}
     <div class="card"><div class="eyebrow">Cette semaine</div><div class="week" style="margin-top:10px">${week}</div><p style="margin:10px 0 0;font-size:13.5px"><a href="#planning">Voir le programme de chaque soir</a></p></div>
     ${changesCard()}${newsCard()}${infosCard()}
     <div class="card"><div class="eyebrow">Tous les devoirs à venir</div><ul class="list dev" style="margin-top:10px">${dev}</ul><p style="margin:10px 0 0;font-size:13.5px"><a href="#fiches/maths/taf">Tout le travail donné depuis septembre, par matière</a></p></div>
-    <div class="card"><div class="eyebrow">Récompenses</div><div class="rewards" style="margin-top:10px">${rewards}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Choisies à l'avance avec maman. Révision du soir = 10 XP, test blanc = 20.</p></div>
+    <div class="card"><div class="eyebrow">Récompenses</div><div class="rewards" style="margin-top:10px">${rewards}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Choisies à l'avance avec maman. Révision du soir = 10 rubis, test blanc = 20, quiz réussi (8/10) = 5.</p></div>
    </div></div>`;
 }
 let selDay=null;
@@ -128,7 +129,7 @@ function vBoss(){
     const pr=bossPrep(b); let st= b.date&&n<0?`<span class="pill">Passé</span>`: ready<=0?(pr.total&&pr.done<pr.total?`<span class="pill warn">Révisions à rattraper : ${pr.done}/${pr.total}</span>`:`<span class="pill good">Prête ✓${pr.total?" "+pr.done+"/"+pr.total+" révisions":""}</span>`): `<span class="pill warn">Objectif « prête » dans ${ready} j${pr.total?" · "+pr.done+"/"+pr.total+" révisions faites":""}</span>`;
     return `<div class="card bcard" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden||!b.date?`<span class="pill">date à confirmer</span>`:""}</div><h3>${esc(b.title)}</h3>
     <div class="meta"><span><span class="muted">Évaluation</span><br><b>${b.date?fmt(b.date):"pas encore annoncé"}</b>${b.when?`<br><span class="muted">${esc(b.when)}</span>`:""}</span><span style="text-align:right"><span class="muted">Prête le</span><br><b>${fmt(b.ready)}</b></span></div>
-    <p class="muted" style="margin:0;font-size:14px">${esc(b.know)}</p><div class="row">${st}</div>${links(b.go)}</div>`;};
+    <p class="muted" style="margin:0;font-size:14px">${esc(b.know)}</p><div class="row">${st}</div>${links((b.go||[]).concat(CARDS[b.subj]&&!(b.go||[]).includes("cartes:"+b.subj)?["cartes:"+b.subj]:[]).concat(CARDS[b.subj]?["quiz:"+b.subj]:[]))}</div>`;};
   const past=PASSED.map(p=>`<li><span class="date">${fmt(p[0])}</span><div style="min-width:0">${chip(p[1])}<div style="margin-top:4px">${esc(p[2])}</div></div><b class="res">${esc(p[3])}</b></li>`).join("");
   return `<div class="card"><h2 style="font-size:22px">Les évaluations à venir</h2><p class="muted" style="margin:6px 0 0">Toutes les évaluations annoncées sur Pronote (ou prévues par les profs), avec ce qu'il faut savoir et les documents pour réviser. « Date à confirmer » : le prof l'a annoncée mais pas encore datée sur Pronote.</p></div><div class="bosses">${sorted.map(card).join("")}</div>
   <div class="card"><div class="eyebrow">Évaluations passées</div><ul class="list" style="margin-top:10px">${past}</ul><p class="muted" style="margin:10px 0 0;font-size:13px">Toutes les notes publiées sont dans <a href="#notes">Mes notes</a>.</p></div>`;
@@ -262,23 +263,23 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.getElementById("viewer")&&!document.getElementById("viewer").hidden) closeDoc();});
 
-let selDeck="maths", cardIdx=0, flipped=false, onlyReview=false;
-function deckList(s){const all=CARDS[s].map((c,i)=>({c,i})); return onlyReview?all.filter(x=>state.cards[s+":"+x.i]!==1):all;}
+let selDeck="maths", cardIdx=0, flipped=false, onlyReview=true;
+function deckList(s){const all=CARDS[s].map((c,i)=>({c,i})); return onlyReview?srsDue(s):all;}
 function vCartes(){
   const decks=Object.keys(CARDS).map(s=>{const tot=CARDS[s].length, ok=CARDS[s].filter((c,i)=>state.cards[s+":"+i]===1).length;
-    return `<button class="deck" style="${sc(s)}" aria-pressed="${s===selDeck}" data-deck="${s}">${chip(s)}<b>${tot} cartes</b><div class="meter"><i style="width:${ok/tot*100}%"></i></div><span class="muted" style="font-size:12.5px">${ok} sues</span></button>`;}).join("");
+    return `<button class="deck" style="${sc(s)}" aria-pressed="${s===selDeck}" data-deck="${s}">${chip(s)}<b>${tot} cartes</b><div class="meter"><i style="width:${ok/tot*100}%"></i></div><span class="muted" style="font-size:12.5px">${ok} sues · ${srsDue(s).length} à revoir</span></button>`;}).join("");
   const list=deckList(selDeck); const s=selDeck;
   let zone;
-  if(!list.length){zone=`<div class="card" style="text-align:center"><h3>Tout est su dans ce paquet !</h3><p class="muted">Repasse en mode « Toutes les cartes » pour un dernier tour.</p></div>`;}
+  if(!list.length){zone=`<div class="card" style="text-align:center"><h3>Rien à revoir aujourd'hui dans ce paquet !</h3><p class="muted">Les cartes sues reviendront dans quelques jours pour ne pas les oublier. Tu peux faire un <a href="#quiz/${s}">quiz</a> ou passer en « Toutes les cartes ».</p></div>`;}
   else{ if(cardIdx>=list.length) cardIdx=0; const it=list[cardIdx];
     zone=`<div class="flip ${flipped?"on":""}" style="${sc(s)}"><div class="inner" role="button" tabindex="0" data-flip="1" aria-label="Retourner la carte">
       <div class="face"><div class="big">${esc(it.c[0])}</div><div class="hint">Touche la carte pour voir la réponse</div></div>
       <div class="face back"><div class="big">${esc(it.c[1])}</div><div class="hint">Tu savais ?</div></div></div></div>
       <div class="cardbtns"><button class="btn ko" data-know="0">À revoir</button><button class="btn ok" data-know="1">Je savais</button></div>
       <p class="muted" style="text-align:center;margin:0">Carte ${cardIdx+1} sur ${list.length}</p>`;}
-  return `<div class="card"><div class="deckbar"><div><h2 style="font-size:22px">Cartes mémoire</h2><p class="muted" style="margin:4px 0 0">Lis la question, réponds dans ta tête, retourne la carte. Les cartes « à revoir » reviennent jusqu'à ce que tu les saches.</p></div>
-   <div class="switch"><button aria-pressed="${!onlyReview}" data-mode="all" style="${sc(s)}">Toutes les cartes</button><button aria-pressed="${onlyReview}" data-mode="review" style="${sc(s)}">Seulement à revoir</button></div></div></div>
-   <div class="decks">${decks}</div>${zone}`;
+  return `<div class="card"><div class="deckbar"><div><h2 style="font-size:22px">Cartes mémoire</h2><p class="muted" style="margin:4px 0 0">Lis la question, réponds dans ta tête, retourne la carte. Mode « Cartes du jour » : les cartes ratées reviennent le jour même, les cartes sues dans 1, 3, 7, 14 puis 30 jours. C'est la méthode la plus efficace pour retenir.</p></div>
+   <div class="switch"><button aria-pressed="${!onlyReview}" data-mode="all" style="${sc(s)}">Toutes les cartes</button><button aria-pressed="${onlyReview}" data-mode="review" style="${sc(s)}">Cartes du jour</button></div></div></div>
+   <div class="decks">${decks}</div>${zone}<p style="text-align:center;margin:0"><a class="btn ghost" href="#quiz/${s}">Faire un quiz de ${esc(SUBJ[s].n.split(" (")[0])}</a></p>`;
 }
 function vNotes(){
   const A=(LATEST&&LATEST.averages)||{}, O=LATEST&&LATEST.overall;
@@ -316,9 +317,9 @@ function applyContent(c,quiet){
   if(Array.isArray(c.missions)) c.missions.forEach(nm=>{if(!nm||!nm.date) return; const i=MISSIONS.findIndex(m=>m.date===nm.date); if(i>=0){if(MISSIONS[i].auto) MISSIONS[i]={xp:10,go:[],...nm};} else MISSIONS.push({xp:10,go:[],...nm});});
   MISSIONS.sort((a,b)=>a.date.localeCompare(b.date));
   if(c.updatedAt){const d=new Date(c.updatedAt); UPDATED="Données Pronote du "+fmtLong(iso(d))+" à "+pad(d.getHours())+"h"+pad(d.getMinutes());}
-  if(ROLE==="parent"&&c.progress&&c.progress.p){const p=c.progress.p; state={done:{...(p.done||{})},checks:{...(p.checks||{})},cards:{...(p.cards||{})},devoirs:{...(p.devoirs||{})}};}
+  if(ROLE==="parent"&&c.progress&&c.progress.p){const p=c.progress.p; state={done:{...(p.done||{})},checks:{...(p.checks||{})},cards:{...(p.cards||{})},devoirs:{...(p.devoirs||{})},srs:{...(p.srs||{})},quiz:JSON.parse(JSON.stringify(p.quiz||{}))};}
   else if(ROLE!=="parent"&&c.progress&&c.progress.p&&!Object.keys(state.done).length&&!Object.keys(state.checks).length&&!Object.keys(state.cards).length){
-    const p=c.progress.p; state={done:{...(p.done||{})},checks:{...(p.checks||{})},cards:{...(p.cards||{})},devoirs:{...(p.devoirs||{})}}; QG.LS.set(KEY,JSON.stringify(state)); if(!quiet) toast("Progrès récupérés depuis la sauvegarde");}
+    const p=c.progress.p; state={done:{...(p.done||{})},checks:{...(p.checks||{})},cards:{...(p.cards||{})},devoirs:{...(p.devoirs||{})},srs:{...(p.srs||{})},quiz:JSON.parse(JSON.stringify(p.quiz||{}))}; QG.LS.set(KEY,JSON.stringify(state)); if(!quiet) toast("Progrès récupérés depuis la sauvegarde");}
   syncLabel();
 }
 function syncLabel(){
@@ -397,13 +398,14 @@ function vSuivi(){
   const av=LATEST&&LATEST.averages||{}; const weak=Object.entries(av).filter(([s,a])=>a.c!=null&&SUBJ[s]).sort((a,b)=>(a[1].e-a[1].c)-(b[1].e-b[1].c)).slice(0,3)
     .map(([s,a])=>`<div class="nline"><span>${chip(s)}</span><b class="${a.e>=a.c?"up":"down"}">${String(a.e.toFixed(1)).replace(".",",")} <span class="muted" style="font-weight:600">(groupe ${String(a.c.toFixed(1)).replace(".",",")})</span></b></div>`).join("");
   return `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="font-size:22px">Suivi de ${esc(name)}</h2><p class="muted" style="margin:4px 0 0">${ROLE==="parent"?(last?"Dernière activité dans le QG : "+fmtLong(iso(last))+" à "+pad(last.getHours())+"h"+pad(last.getMinutes()):"Pas encore d'activité reçue depuis l'ordinateur de "+esc(name)+"."):"Ce que voient aussi tes parents."}</p></div>
-   <div style="text-align:right"><div class="eyebrow">XP</div><div class="avg">${xp()}</div><div class="muted" style="font-size:13px">série : ${streak()} j</div></div></div></div>
+   <div style="text-align:right"><div class="eyebrow">Rubis</div><div class="avg">${xp()}</div><div class="muted" style="font-size:13px">série : ${streak()} j</div></div></div></div>
   <div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">
    <div class="card"><div class="eyebrow">Missions des 7 derniers jours</div><div class="week" style="margin-top:10px">${days.join("")}</div><p class="muted" style="margin:10px 0 0;font-size:13.5px">${doneN} missions réussies sur ${past.length} depuis le début.</p></div>
    <div class="card"><div class="eyebrow">Devoirs des 7 prochains jours</div><div class="avg" style="margin-top:6px">${upOk}/${up.length}</div><p class="muted" style="margin:4px 0 0;font-size:13.5px">cochés comme faits (dans le QG ou sur Pronote). <a href="#aujourdhui">Voir la liste</a></p></div>
    <div class="card"><div class="eyebrow">Prochains contrôles et révisions faites</div><ul class="list" style="margin-top:10px">${bosses}</ul></div>
   </div><div style="display:grid;gap:18px;align-content:start;min-width:0">
    ${weak?`<div class="card"><div class="eyebrow">Matières à surveiller (moyennes Pronote)</div><div style="margin-top:8px">${weak}</div><p style="margin:10px 0 0;font-size:13.5px"><a href="#notes">Toutes les notes</a></p></div>`:""}
+   ${succesCard()}
    <div class="card"><div class="eyebrow">Cartes mémoire sues</div><div style="margin-top:8px">${decks}</div></div>
   </div></div>`;
 }
@@ -530,13 +532,15 @@ function secRevisions(d){
   const evl=ev.length?`<div class="s-evals">${ev.map(b=>`<a href="#boss" class="s-eval" style="${sc(b.subj)}"><b>${esc(SUBJ[b.subj]?SUBJ[b.subj].n.split(" (")[0]:b.subj)}</b> · ${esc(b.title)}<span>${fmt(b.date)} · ${quand(d,b.date)}</span></a>`).join("")}</div>`:`<p class="muted s-empty">Aucune évaluation annoncée dans les 10 prochains jours.</p>`;
   let mis="";
   if(m){const done=!!state.done[m.date], b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
-    mis=`<div class="s-mission" style="${sc(m.subj)}"><div class="row">${chip(m.subj)}<span class="pill">+${m.xp} XP</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : être prête pour ${esc(r.title)}</span>`:""}</div>
+    mis=`<div class="s-mission" style="${sc(m.subj)}"><div class="row">${chip(m.subj)}<span class="pill">+${m.xp} rubis</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : être prête pour ${esc(r.title)}</span>`:""}</div>
       <p class="s-mtitle">${esc(m.title)}</p><div class="where"><b>Avec :</b> ${esc(m.where||"")}${links(m.go)}</div>
       <button class="btn ${done?"done":""}" data-done="${m.date}">${done?"✓ Révision faite":"J'ai fini ma révision"}</button></div>`;}
   else if(holidayOf(d)) mis=`<p class="muted s-empty">Vacances : pas de révision prévue.</p>`;
   else mis=`<p class="muted s-empty">Pas de révision prévue ce jour-là.</p>`;
   const rv=R.length?`<ul class="checks" style="margin-top:8px">${R.map(r=>`<li><label><input type="checkbox" data-check="${esc(r.id)}" ${state.checks[r.id]?"checked":""}><span>${chip(r.subj)} ${esc(r.t)}</span></label>${links(r.go)}</li>`).join("")}</ul>`:"";
-  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[1]}</span><h3>Réviser pour les évaluations qui arrivent</h3></div>${evl}${mis}${rv}</section>`;
+  const nc=d===TODAY?cartesDuJour():0;
+  const cj=nc?`<p style="margin:10px 0 0;font-size:14px"><b>Bonus 5 min :</b> <a href="#cartes">${nc} carte${nc>1?"s":""} mémoire à revoir aujourd'hui</a> · <a href="#quiz">faire un quiz</a></p>`:"";
+  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[1]}</span><h3>Réviser pour les évaluations qui arrivent</h3></div>${evl}${mis}${rv}${cj}</section>`;
 }
 function secCours(d){
   const C=coursDuJour(d); let body;
@@ -562,14 +566,131 @@ function evalsCard(){
    <p style="margin:10px 0 0;font-size:13.5px"><a href="#boss">Le détail de chaque évaluation : quoi réviser, avec quels documents</a></p></div>`;
 }
 
+/* ============ RUBIS, COUPES ET SUCCÈS ============ */
+const RUBIS_SVG=`<svg class="rubis" viewBox="0 0 12 20" aria-hidden="true"><path d="M6 0 12 5v10l-6 5-6-5V5z" fill="#22b14c"/><path d="M6 0v20L0 15V5z" fill="#1a8f3c"/><path d="M6 4 9 6.5v7L6 16 3 13.5v-7z" fill="#7be08f" opacity=".75"/></svg>`;
+const COUPES=["Coupe Champignon","Coupe Fleur","Coupe Étoile","Coupe Spéciale"];
+function quizRubis(){let n=0; const L=(state.quiz&&state.quiz.log)||{}; for(const k in L) if(L[k]>=8) n+=5; return n;}
+function succes(){
+  const S=state, ch=S.checks||{}, dv=Object.keys(S.devoirs||{}).length, cours=Object.keys(ch).filter(k=>k.startsWith("cours:")).length;
+  const log=(S.quiz&&S.quiz.log)||{}, parfait=Object.values(log).some(v=>v>=10);
+  const deckOk=Object.keys(CARDS).some(s=>CARDS[s].length&&CARDS[s].every((c,i)=>srsBox(s,i)>=3));
+  const pret=BOSSES.some(b=>b.date&&b.date<=TODAY&&(()=>{const p=bossPrep(b); return p.total&&p.done===p.total;})());
+  const nd=MISSIONS.filter(m=>S.done[m.date]).length, st=streak();
+  return [
+    ["Première quête","1 révision du soir terminée",nd>=1],["Série de 3","3 soirs de suite",st>=3],["Série de 7","7 soirs de suite",st>=7],
+    ["Quiz parfait","10/10 à un quiz",parfait],["Maître des cartes","un paquet de cartes entièrement su",deckOk],
+    ["Prête à temps","toutes les révisions faites avant une évaluation",pret],["Devoirs au carré","20 devoirs cochés",dv>=20],["Toujours à jour","20 cours du jour relus",cours>=20]];
+}
+function succesCard(){const L=succes(); return `<div class="card"><div class="eyebrow">Succès débloqués : ${L.filter(x=>x[2]).length}/${L.length}</div><div class="badges">${L.map(([t,d,ok])=>`<div class="badge ${ok?"on":""}" title="${esc(d)}"><b>${ok?"★":"☆"} ${esc(t)}</b><span>${esc(d)}</span></div>`).join("")}</div></div>`;}
+
+/* ============ CARTES MÉMOIRE : RÉPÉTITION ESPACÉE ============ */
+/* Chaque carte est dans une boîte de 1 à 5. Su : boîte suivante, revient dans 1, 3, 7, 14 puis 30 jours. Raté : boîte 1, revient aujourd'hui. */
+const SRS_GAP=[0,1,3,7,14,30];
+function srsGet(s,i){const v=(state.srs||{})[s+":"+i]; if(!v) return null; const [b,n]=String(v).split("|"); return {b:+b||1,n:n||TODAY};}
+const srsBox=(s,i)=>{const g=srsGet(s,i); return g?g.b:(state.cards[s+":"+i]===1?2:0);};
+/* cartes à revoir aujourd'hui + au plus 5 nouvelles cartes par paquet et par séance */
+function srsDue(s){const all=CARDS[s].map((c,i)=>({c,i}));
+  const rev=all.filter(x=>{const g=srsGet(s,x.i); return g&&g.n<=TODAY;}), neu=all.filter(x=>!srsGet(s,x.i)&&state.cards[s+":"+x.i]!==1).slice(0,5);
+  return rev.concat(neu);}
+function srsAnswer(s,i,know){
+  state.srs=state.srs||{}; const g=srsGet(s,i)||{b:0};
+  const b=know?Math.min(5,Math.max(1,g.b)+(g.b?1:0)):1; const n=know?iso(new Date(dObj(TODAY).getTime()+SRS_GAP[b]*864e5)):TODAY;
+  state.srs[s+":"+i]=b+"|"+n;
+}
+function cartesDuJour(){return Object.keys(CARDS).reduce((t,s)=>t+srsDue(s).length,0);}
+
+/* ============ QUIZ ============ */
+let selQuiz=null, QZ=null;
+function shuffle(a){a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
+function newQuiz(s){
+  const deck=CARDS[s]||[]; if(deck.length<2) return null;
+  const order=shuffle(deck.map((c,i)=>i)).sort((a,b)=>srsBox(s,a)-srsBox(s,b)).slice(0,Math.min(10,deck.length));
+  const pool=deck.map(c=>c[1]); const other=Object.keys(CARDS).filter(x=>x!==s).flatMap(x=>CARDS[x].map(c=>c[1]));
+  const qs=order.map(i=>{const ok=deck[i][1]; let wrong=shuffle([...new Set(pool.filter(a=>a!==ok))]).slice(0,3);
+    if(wrong.length<3) wrong=wrong.concat(shuffle(other.filter(a=>a!==ok&&!wrong.includes(a))).slice(0,3-wrong.length));
+    return {i,q:deck[i][0],opts:shuffle([ok,...wrong]),ok,pick:null};});
+  return {s,qs,k:0,t0:Date.now(),end:null};
+}
+function vQuiz(){
+  const subs=Object.keys(CARDS).filter(s=>CARDS[s].length>=2); if(!selQuiz||!CARDS[selQuiz]) selQuiz=subs[0];
+  if(!QZ||QZ.s!==selQuiz) QZ=newQuiz(selQuiz);
+  const s=selQuiz, best=((state.quiz||{}).best||{})[s];
+  const head=`<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="font-size:22px">Quiz</h2><p class="muted" style="margin:4px 0 0">10 questions, 4 réponses possibles. 8/10 ou plus = +5 rubis (une fois par jour et par matière).</p></div>${best!=null?`<span class="pill good">Record : ${best}/10</span>`:""}</div></div>
+   <div class="switch" role="group">${subs.map(x=>`<a role="button" style="${sc(x)}" aria-pressed="${x===s}" href="#quiz/${x}">${SUBJ[x].n}</a>`).join("")}</div>`;
+  if(!QZ) return head+`<div class="card"><p>Pas assez de cartes pour un quiz dans cette matière.</p></div>`;
+  if(QZ.end){const sc10=QZ.qs.filter(q=>q.pick===q.ok).length, sec=Math.round((QZ.end-QZ.t0)/1000);
+    return head+`<div class="card quizend" style="${sc(s)}"><div class="eyebrow">Résultat</div><div class="avg">${sc10}/${QZ.qs.length}</div><p class="muted">en ${Math.floor(sec/60)} min ${sec%60} s${sc10>=8?" · +5 rubis gagnés":""}</p>
+     <ul class="list">${QZ.qs.map(q=>`<li><span class="date">${q.pick===q.ok?"✓":"✗"}</span><div style="min-width:0"><b>${esc(q.q)}</b><div class="muted" style="margin-top:2px">${esc(q.ok)}</div></div></li>`).join("")}</ul>
+     <div class="row" style="margin-top:12px"><button class="btn" data-qz="again">Nouveau quiz</button><a class="btn ghost" href="#cartes/${s}">Revoir les cartes</a></div></div>`;}
+  const q=QZ.qs[QZ.k];
+  return head+`<div class="card quiz" style="${sc(s)}"><div class="row" style="justify-content:space-between"><span class="eyebrow">Question ${QZ.k+1} sur ${QZ.qs.length}</span><span class="muted">${QZ.qs.filter(x=>x.pick&&x.pick===x.ok).length} bonne(s)</span></div>
+   <div class="meter" style="margin:8px 0 14px"><i style="width:${QZ.k/QZ.qs.length*100}%"></i></div>
+   <h3 class="qq">${esc(q.q)}</h3><div class="qopts">${q.opts.map((o,j)=>{const cls=q.pick==null?"":o===q.ok?"good":o===q.pick?"bad":"";
+     return `<button class="qopt ${cls}" data-qz="${j}" ${q.pick!=null?"disabled":""}>${esc(o)}</button>`;}).join("")}</div>
+   ${q.pick!=null?`<div class="row" style="margin-top:12px"><span class="pill ${q.pick===q.ok?"good":"warn"}">${q.pick===q.ok?"Bravo !":"Réponse : "+esc(q.ok)}</span><button class="btn" data-qz="next">${QZ.k+1<QZ.qs.length?"Question suivante":"Voir mon score"}</button></div>`:""}</div>`;
+}
+document.addEventListener("click",e=>{const t=e.target.closest("[data-qz]"); if(!t||!QZ) return; const v=t.dataset.qz;
+  if(v==="again"){QZ=newQuiz(selQuiz); rerender(); return;}
+  if(v==="next"){if(QZ.k+1<QZ.qs.length) QZ.k++; else {QZ.end=Date.now(); const n=QZ.qs.filter(q=>q.pick===q.ok).length;
+      if(ROLE!=="parent"){state.quiz=state.quiz||{}; state.quiz.best=state.quiz.best||{}; state.quiz.log=state.quiz.log||{};
+        state.quiz.best[QZ.s]=Math.max(n,state.quiz.best[QZ.s]||0); const k=TODAY+":"+QZ.s; state.quiz.log[k]=Math.max(n,state.quiz.log[k]||0);
+        QZ.qs.forEach(q=>srsAnswer(QZ.s,q.i,q.pick===q.ok)); save();}}
+    rerender(); return;}
+  const q=QZ.qs[QZ.k]; if(q.pick!=null) return; q.pick=q.opts[+v]; rerender();});
+
+/* ============ MON SAC POUR DEMAIN (emploi du temps Pronote) ============ */
+function edtJour(d){return ((LATEST&&LATEST.edt)||[]).filter(l=>l.d===d);}
+function sacCard(){
+  const d=nextClassDay(TODAY), L=edtJour(d); if(!LATEST||!LATEST.edt) return "";
+  if(!L.length) return `<div class="card"><div class="eyebrow">Mon sac pour ${fmtLong(d)}</div><p class="muted" style="margin:8px 0 0">L'emploi du temps de ce jour n'est pas encore sur Pronote.</p></div>`;
+  const subs=[...new Set(L.filter(l=>!l.x).map(l=>l.s))];
+  const dev=DEVOIRS.filter(x=>x.due===d), ev=BOSSES.filter(b=>b.date===d);
+  const items=subs.map(s=>s==="eps"?"Tenue de sport et baskets (EPS)":`Cahier et livre de ${SUBJ[s]?SUBJ[s].n.split(" (")[0]:s}`)
+    .concat(dev.filter(x=>/rendre|imprim|apporter|feuille|copie|dm\b|devoir maison/i.test(x.text)).map(x=>`À rendre en ${SUBJ[x.subj]?SUBJ[x.subj].n.split(" (")[0]:x.subj} : ${x.text.slice(0,70)}`))
+    .concat(["Trousse complète, agenda, gourde"]);
+  return `<div class="card"><div class="eyebrow">Mon emploi du temps et mon sac pour ${fmtLong(d)}</div>
+   ${ev.length?`<p class="warnmsg" style="margin:8px 0 0">Évaluation ce jour-là : ${ev.map(b=>esc(b.title)).join(", ")}</p>`:""}
+   <ul class="list edt" style="margin-top:10px">${L.map(l=>`<li class="${l.x?"ko":""}"><span class="date">${esc(l.h1)}–${esc(l.h2)}</span><div style="min-width:0">${SUBJ[l.s]&&l.s!=="autre"?chip(l.s):`<span class="chip">${esc(l.sn||"Cours")}</span>`}<div class="muted" style="margin-top:3px;font-size:13px">${[l.room&&"salle "+l.room,l.prof].filter(Boolean).map(esc).join(" · ")}${l.st?` · <b>${esc(l.st)}</b>`:""}${l.t?` · <b>évaluation</b>`:""}</div></div></li>`).join("")}</ul>
+   <div class="eyebrow" style="margin-top:12px">Dans mon sac</div><ul class="checks" style="margin-top:6px">${items.map((t,i)=>{const k="sac:"+d+":"+i; return `<li><label><input type="checkbox" data-check="${k}" ${state.checks[k]?"checked":""}><span>${esc(t)}</span></label></li>`;}).join("")}</ul></div>`;
+}
+
+/* ============ RECHERCHE ============ */
+let rq="";
+const fold=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const strip=h=>String(h||"").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&[a-z]+;/g," ");
+function snippet(txt,words){const t=String(txt||"").replace(/\s+/g," "); const f=fold(t); let i=f.indexOf(words[0]); if(i<0) i=0;
+  const a=Math.max(0,i-50), part=t.slice(a,a+170); let out=esc(part);
+  words.forEach(w=>{if(w.length<2) return; const re=new RegExp("("+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").split("").map(ch=>{const m={a:"[aàâä]",e:"[eéèêë]",i:"[iîï]",o:"[oôö]",u:"[uùûü]",c:"[cç]"}; return m[ch]||ch;}).join("")+")","gi"); out=out.replace(re,"<mark>$1</mark>");});
+  return (a>0?"…":"")+out+(a+170<t.length?"…":"");}
+function vRecherche(){
+  const words=fold(rq).split(/\s+/).filter(Boolean);
+  if(!words.length) return `<div class="card"><h2 style="font-size:22px">Recherche</h2><p class="muted">Tape un mot dans la barre de recherche : un chapitre, une notion, un nom de document… Par exemple « Pythagore », « Lumières », « Raven ».</p></div>`;
+  const hit=t=>{const f=fold(t); return words.every(w=>f.includes(w));};
+  const G=[];
+  const add=(title,list,render)=>{if(list.length) G.push(`<div class="card"><div class="eyebrow">${title} · ${list.length}</div><ul class="list sres" style="margin-top:8px">${list.slice(0,12).map(render).join("")}</ul>${list.length>12?`<p class="muted" style="margin:8px 0 0;font-size:13px">et ${list.length-12} autre(s) : précise ta recherche.</p>`:""}</div>`);};
+  add("Évaluations",BOSSES.filter(b=>hit(b.title+" "+b.know+" "+(SUBJ[b.subj]||{}).n)),b=>`<li><span class="date">${b.date?fmt(b.date):"à dater"}</span><div style="min-width:0">${chip(b.subj)} <a href="#boss"><b>${esc(b.title)}</b></a><div class="muted">${snippet(b.know,words)}</div></div></li>`);
+  add("Fiches de révision",Object.keys(FICHES).filter(s=>hit(SUBJ[s].n+" "+strip(FICHES[s].html)+" "+(FICHES[s].check||[]).join(" "))),s=>`<li><div style="min-width:0">${chip(s)} <a href="#fiches/${s}"><b>Fiche ${esc(SUBJ[s].n)}</b></a><div class="muted">${snippet(strip(FICHES[s].html)+" "+(FICHES[s].check||[]).join(" "),words)}</div></div></li>`);
+  add("Documents des profs",Object.entries(DOCS).filter(([,d])=>hit(d.n+" "+d.o+" "+(SUBJ[d.s]||{}).n)),([id,d])=>`<li><span class="date">${esc(d.d||"")}</span><div style="min-width:0">${lk("doc:"+id)}</div></li>`);
+  add("Cours (cahier de textes)",CDT.cdt.filter(e=>hit(e.t+" "+e.x+" "+e.c+" "+(SUBJ[e.s]||{}).n)).sort((a,b)=>b.d.localeCompare(a.d)),e=>`<li><span class="date">${fmt(e.d)}</span><div style="min-width:0">${chip(e.s)} <a href="#fiches/${FICHES[e.s]?e.s:"maths"}/cdt"><b>${esc(e.t)}</b></a><div class="muted">${snippet(e.x||e.t,words)}</div></div></li>`);
+  add("Devoirs",CDT.taf.filter(w=>hit(w.x+" "+(SUBJ[w.s]||{}).n)).sort((a,b)=>b.due.localeCompare(a.due)),w=>`<li><span class="date">pour ${fmt(w.due)}</span><div style="min-width:0">${chip(w.s)} <a href="#fiches/${FICHES[w.s]?w.s:"maths"}/taf">voir</a><div class="muted">${snippet(w.x,words)}</div></div></li>`);
+  add("Exercices",Object.keys(EX).flatMap(s=>EX[s].map((x,i)=>({s,i,x}))).filter(o=>hit(o.x.t+" "+strip(o.x.q))),o=>`<li><div style="min-width:0">${lk("ex:"+o.s+":"+o.i)}<div class="muted">${snippet(strip(o.x.q),words)}</div></div></li>`);
+  add("Cartes mémoire",Object.keys(CARDS).flatMap(s=>CARDS[s].map((c,i)=>({s,c}))).filter(o=>hit(o.c[0]+" "+o.c[1])),o=>`<li><div style="min-width:0">${chip(o.s)} <a href="#cartes/${o.s}">${esc(o.c[0])}</a><div class="muted">${esc(o.c[1])}</div></div></li>`);
+  add("Infos du collège",(LATEST&&LATEST.news||[]).filter(n=>hit(n.t+" "+n.x)),n=>`<li><span class="date">${fmt(n.d)}</span><div style="min-width:0"><b>${esc(n.t)}</b><div class="muted">${snippet(n.x,words)}</div></div></li>`);
+  return `<div class="card"><h2 style="font-size:22px">Résultats pour « ${esc(rq)} »</h2></div>${G.join("")||`<div class="card"><p class="muted" style="margin:0">Rien trouvé. Essaie un autre mot, ou moins de mots.</p></div>`}`;
+}
+let rqT=null;
+document.addEventListener("input",e=>{if(e.target.id!=="q") return; rq=e.target.value; clearTimeout(rqT); rqT=setTimeout(()=>{if(!rq.trim()) return; if(!location.hash.startsWith("#recherche")) location.hash="recherche"; else rerender();},250);});
+document.addEventListener("keydown",e=>{if(e.key==="/"&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault(); const i=document.getElementById("q"); i&&i.focus();}});
+
 /* ============ NAVIGATION ============ */
-const VIEWS={aujourdhui:vAujourdhui,planning:vPlanning,boss:vBoss,fiches:vFiches,cartes:vCartes,exercices:vExercices,notes:vNotes,suivi:vSuivi,reglages:vReglages};
+const VIEWS={aujourdhui:vAujourdhui,planning:vPlanning,boss:vBoss,fiches:vFiches,cartes:vCartes,exercices:vExercices,notes:vNotes,suivi:vSuivi,reglages:vReglages,quiz:vQuiz,recherche:vRecherche};
 function route(scroll){
   const parts=(location.hash||"").slice(1).split("/").map(x=>{try{return decodeURIComponent(x)}catch(e){return x}});
   const v=VIEWS[parts[0]]?parts[0]:"aujourdhui";
   if(v==="fiches"&&FICHES[parts[1]]) selSubj=parts[1];
   if(v==="exercices"&&EX[parts[1]]) selEx=parts[1];
   if(v==="cartes"&&CARDS[parts[1]]&&selDeck!==parts[1]){selDeck=parts[1];cardIdx=0;flipped=false;}
+  if(v==="quiz"&&CARDS[parts[1]]&&selQuiz!==parts[1]){selQuiz=parts[1];QZ=null;}
   if(v==="planning"&&/^\d{4}-\d{2}-\d{2}$/.test(parts[1]||"")) selDay=parts[1];
   Object.keys(VIEWS).forEach(k=>{document.getElementById("v-"+k).hidden=k!==v;});
   document.querySelectorAll("nav.tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.v===v?"page":"false"));
@@ -592,7 +713,7 @@ document.addEventListener("click",e=>{
   if(t.dataset.flip){flipped=!flipped; const f=t.closest(".flip"); f&&f.classList.toggle("on",flipped); return;}
   if(t.dataset.mode){onlyReview=t.dataset.mode==="review";cardIdx=0;flipped=false;rerender();return;}
   if(ROLE==="parent"&&(t.dataset.know||t.dataset.done)){parentOnly();return;}
-  if(t.dataset.know){const list=deckList(selDeck); const it=list[cardIdx]; if(it){state.cards[selDeck+":"+it.i]=Number(t.dataset.know); save();}
+  if(t.dataset.know){const list=deckList(selDeck); const it=list[cardIdx]; if(it){state.cards[selDeck+":"+it.i]=Number(t.dataset.know); srsAnswer(selDeck,it.i,t.dataset.know==="1"); save();}
     flipped=false; if(!(onlyReview&&t.dataset.know==="1")) cardIdx++; rerender(); return;}
   if(t.dataset.done){const d=t.dataset.done; if(state.done[d]) delete state.done[d]; else state.done[d]=true; save(); rerender();}
   else if(t.dataset.day){selDay=t.dataset.day; rerender(); const det=document.querySelector(".mission.detail"); det&&det.scrollIntoView({block:"nearest",behavior:"smooth"});}

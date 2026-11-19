@@ -141,6 +141,10 @@ export function transform(raw, base, files, seen, now) {
   }
   changes.sort((a, b) => (a.date + a.h).localeCompare(b.date + b.h));
 
+  // ---------- emploi du temps (2 semaines) : pour « mon sac pour demain » ----------
+  const edt = (raw.lessons || []).map((l) => ({ d: parisDate(l.start), h1: hm(l.start), h2: hm(l.end), s: subjKey(l.subject), sn: l.subject, room: (l.rooms || []).join(", "), prof: (l.teachers || []).join(", "), x: l.canceled ? 1 : 0, st: l.status || "", t: l.test ? 1 : 0, k: parisParts(l.start).h * 60 + parisParts(l.start).m }))
+    .filter((l) => l.d >= today && l.d <= addDays(today, 14)).sort((a, b) => a.d.localeCompare(b.d) || a.k - b.k);
+
   // ---------- informations du collège ----------
   const news = (raw.news || []).filter((n) => n.date && parisDate(n.date) >= addDays(today, -45)).map((n) => {
     const x = { id: n.id, d: parisDate(n.date), t: n.title || "Information", a: n.author || "", cat: n.category || "", x: cut(htmlToText(n.content), 1500), f: (n.attachments || []).map((a) => fref(a, "", parisDate(n.date))) };
@@ -228,7 +232,7 @@ export function transform(raw, base, files, seen, now) {
   return {
     content: {
       v: 2, student: raw.student, holidays, yearStart: raw.yearStart && parisDate(raw.yearStart),
-      devoirs, cdtFull: { cdt, taf }, notes, averages, overall, bosses, missions, revs, changes, news,
+      devoirs, cdtFull: { cdt, taf }, edt, notes, averages, overall, bosses, missions, revs, changes, news,
     },
     events: ev,
   };

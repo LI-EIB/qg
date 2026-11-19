@@ -146,7 +146,7 @@ function vPlanning(){
 function vBoss(){
   const sorted=[...BOSSES].filter(b=>!b.date||diff(b.date,TODAY)<=21).sort((a,b)=>(a.date||a.ready).localeCompare(b.date||b.ready));
   const card=b=>{const n=b.date?diff(TODAY,b.date):null; const ready=diff(TODAY,b.ready);
-    let st= b.date&&n<0?`<span class="pill">Passé</span>`: ready<=0?`<span class="pill good">Prête</span>`: `<span class="pill warn">Prête dans ${ready} j</span>`;
+    const pr=bossPrep(b); let st= b.date&&n<0?`<span class="pill">Passé</span>`: ready<=0?(pr.total&&pr.done<pr.total?`<span class="pill warn">Révisions à rattraper : ${pr.done}/${pr.total}</span>`:`<span class="pill good">Prête ✓${pr.total?" "+pr.done+"/"+pr.total+" révisions":""}</span>`): `<span class="pill warn">Objectif « prête » dans ${ready} j${pr.total?" · "+pr.done+"/"+pr.total+" révisions faites":""}</span>`;
     return `<div class="card bcard" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden?`<span class="pill">caché</span>`:""}</div><h3>${esc(b.title)}</h3>
     <div class="meta"><span><span class="muted">Combat</span><br><b>${b.date?fmt(b.date):"pas encore annoncé"}</b>${b.when?`<br><span class="muted">${esc(b.when)}</span>`:""}</span><span style="text-align:right"><span class="muted">Prête le</span><br><b>${fmt(b.ready)}</b></span></div>
     <p class="muted" style="margin:0;font-size:14px">${esc(b.know)}</p><div class="row">${st}</div>${links(b.go)}</div>`;};
@@ -359,6 +359,11 @@ async function refreshLatest(manual){
 }
 
 
+/* Révisions prévues pour un boss : missions de la même matière dans les 7 jours avant, ou marquées « prête » pour lui */
+function bossPrep(b){ if(!b.date) return {done:0,total:0};
+  const from=iso(new Date(dObj(b.date).getTime()-7*864e5));
+  const L=MISSIONS.filter(m=>m.date<b.date&&m.date>=from&&(m.subj===b.subj||m.ready===b.id)&&m.date<=TODAY);
+  return {done:L.filter(m=>state.done[m.date]).length,total:L.length}; }
 /* ============ DEVOIRS DU SOIR DANS LE PLANNING ============ */
 /* Le soir, on fait d'abord les devoirs du prochain jour de classe, puis la mission.
    Vendredi : rien (les devoirs de lundi sont prévus le week-end). */

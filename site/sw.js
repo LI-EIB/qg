@@ -1,5 +1,5 @@
 /* Le QG : fonctionne hors connexion et reçoit les notifications même quand le QG est fermé. */
-const V="qg-dec5e2c2c0";
+const V="qg-a37544c887";
 const SHELL=["./","index.html","boot.js","app.js","manifest.webmanifest","icon-192.png","icon-512.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith("qg-")&&k!==V&&k!=="qg-files").map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
@@ -10,7 +10,7 @@ self.addEventListener("fetch",e=>{
     e.respondWith(caches.open("qg-files").then(async c=>{const hit=await c.match(e.request,{ignoreSearch:true}); if(hit) return hit; const r=await fetch(e.request); if(r.ok) c.put(e.request,r.clone()); return r;}));
     return;
   }
-  e.respondWith(fetch(e.request).then(r=>{if(r.ok){const cl=r.clone(); caches.open(V).then(c=>c.put(e.request,cl));} return r;})
+  e.respondWith(fetch(e.request.url,{cache:"no-cache",credentials:"same-origin"}).then(r=>{if(r.ok){const cl=r.clone(); caches.open(V).then(c=>c.put(e.request,cl));} return r;})
     .catch(()=>caches.match(e.request,{ignoreSearch:true}).then(r=>r||caches.match("index.html"))));
 });
 self.addEventListener("push",e=>{

@@ -366,7 +366,11 @@ function nextClassDay(d){const x=dObj(d); do{x.setDate(x.getDate()+1);}while(x.g
 function devoirsSoir(d){if(dObj(d).getDay()===5) return {next:null,list:[]}; const n=nextClassDay(d); return {next:n,list:DEVOIRS.filter(x=>x.due===n)};}
 const devKey=d=>d.due+":"+d.subj+":"+d.text.slice(0,24);
 function devoirsBlock(d){
-  const {next,list}=devoirsSoir(d); if(!list.length) return "";
+  const {next,list}=devoirsSoir(d);
+  if(!list.length){
+    if(!next){const n=nextClassDay(d), k=DEVOIRS.filter(x=>x.due===n).length; return `<div class="tonight"><b>Devoirs : rien ce soir.</b> <span class="muted">${k?`Les ${k} devoir${k>1?"s":""} pour ${fmtLong(n)} sont prévus ce week-end.`:`Rien pour ${fmtLong(n)} sur Pronote.`}</span></div>`;}
+    return `<div class="tonight"><b>Devoirs : aucun pour ${fmtLong(next)} sur Pronote.</b> <span class="muted">Place directement à la mission.</span></div>`;
+  }
   const done=list.filter(x=>state.devoirs[devKey(x)]||x.done).length;
   return `<div class="tonight"><div class="row" style="justify-content:space-between"><b>1. D'abord, les devoirs pour ${fmtLong(next)}</b><span class="pill ${done===list.length?"good":"warn"}">${done}/${list.length} faits</span></div>
   <ul class="list dev" style="margin-top:8px">${list.map(x=>{const k=devKey(x), ok=!!state.devoirs[k]||!!x.done; return `<li class="${ok?"ok":""}"><input type="checkbox" aria-label="Devoir fait" data-dev="${esc(k)}" ${ok?"checked":""}><div style="min-width:0">${chip(x.subj)}<div class="txt" style="margin-top:4px">${esc(x.text)}</div>${links(x.go)}</div></li>`;}).join("")}</ul>

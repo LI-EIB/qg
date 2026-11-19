@@ -79,7 +79,7 @@ function nextBoss(){
 function missionCard(m,big){
   const done=!!state.done[m.date], b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
   return `<div class="card mission ${big?"":"detail"}" style="${sc(m.subj)}">
-      <div class="row"><span class="eyebrow">${big?"Mission du soir · ":""}${fmtLong(m.date)}</span>${b?`<span class="pill boss">BOSS ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : prête pour ${esc(r.title)}</span>`:""}</div>
+      <div class="row"><span class="eyebrow">${big?"Mission du soir · ":""}${fmtLong(m.date)}</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : prête pour ${esc(r.title)}</span>`:""}</div>
       <div class="row">${chip(m.subj)}<span class="pill">${m.date.slice(5)>="12-14"?"20 min":(dObj(m.date).getDay()%6===0?"1h30":"30 à 45 min")}</span><span class="pill">+${m.xp} XP</span></div>
       ${big?`<h2>${esc(m.title)}</h2>`:`<h3 style="font-size:20px">${esc(m.title)}</h3>`}
       ${devoirsBlock(m.date)}
@@ -89,46 +89,26 @@ function missionCard(m,big){
     </div>`;
 }
 function vAujourdhui(){
-  const m=currentMission(), v=xp();
-  let hero;
-  if(!m){
-    const hol=holidayOf(TODAY);
-    hero = hol
-      ? `<div class="card mission" style="${sc("autre")}"><div class="eyebrow">Vacances</div><h2>${esc(hol.n||"Vacances")} : bravo, profite !</h2><p class="muted">Retour en classe après le ${fmtLong(hol.end)}.${TODAY>"2026-12-18"&&TODAY<"2027-01-04"?" Une seule chose pendant ces vacances : commencer Brooklyn de Colm Tóibín (à lire pour le 1er février).":""}</p></div>`
-      : `<div class="card mission" style="${sc("autre")}"><div class="eyebrow">${fmtLong(TODAY)}</div><h2>Pas de mission prévue aujourd'hui</h2><p class="muted">Profite pour rattraper une mission ratée dans le <a href="#planning">planning</a>.</p>${devoirsBlock(TODAY)}</div>`;
-  } else hero=missionCard(m,true);
-  const nb=nextBoss();
-  let bossCard="";
-  if(nb){
-    const tgt=nb.date||nb.ready, n=diff(TODAY,tgt);
-    const steps=[[7,"Je découvre la fiche"],[5,"Je m'entraîne"],[3,"Test blanc"],[2,"Prête !"]].map(([k,l])=>{
-      const on=nb.date?diff(TODAY,nb.date)<=k:false;
-      return `<div class="step ${on?"on":""}"><b>J-${k}</b>${l}</div>`;}).join("");
-    bossCard=`<div class="card bossline"><div class="eyebrow">Prochain boss</div>
-      <div class="row" style="justify-content:space-between;margin-top:6px"><div><h3 style="font-size:20px">${esc(nb.title)}</h3><div class="row" style="margin-top:6px">${chip(nb.subj)}<span class="muted">${nb.date?fmtLong(nb.date)+(nb.when?" · "+esc(nb.when):""):"date pas encore annoncée"}</span></div></div>
-      <div style="text-align:right"><div class="count">${nb.date?(n===0?"Jour J":"J-"+n):"?"}</div><div class="muted" style="font-size:13px">prête le ${fmt(nb.ready)}</div></div></div>
-      ${nb.date?`<div class="steps">${steps}</div>`:""}
-      <p class="muted" style="margin:10px 0 0">${esc(nb.know)}</p>${links(nb.go)}</div>`;
-  }
+  const v=xp();
   const t=dObj(TODAY<MISSIONS[0].date?MISSIONS[0].date:TODAY); const mon=new Date(t); mon.setDate(t.getDate()-((t.getDay()+6)%7));
-  let week=""; for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const s=iso(d);const mm=MISSIONS.find(x=>x.date===s);
-    week+=`<a href="#planning/${s}" class="wd ${s===TODAY?"today":""} ${state.done[s]?"ok":""}" style="${sc(mm?mm.subj:"autre")}">${J[d.getDay()]}<b>${d.getDate()}</b>${mm&&SUBJ[mm.subj]?SUBJ[mm.subj].n.split(" ")[0]:"—"}<span class="dot"></span></a>`;}
-  const dev=DEVOIRS.filter(d=>d.due>=TODAY).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,11)
-    .map(d=>{const k=d.due+":"+d.subj+":"+d.text.slice(0,24); const ok=!!state.devoirs[k]||!!d.done;
+  let week=""; for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const s=iso(d);const mm=MISSIONS.find(x=>x.date===s); const ev=BOSSES.some(b=>b.date===s);
+    week+=`<a href="#planning/${s}" class="wd ${s===TODAY?"today":""} ${state.done[s]?"ok":""}" style="${sc(mm?mm.subj:"autre")}">${J[d.getDay()]}<b>${d.getDate()}</b>${ev?"éval.":(mm&&SUBJ[mm.subj]?SUBJ[mm.subj].n.split(" ")[0]:"—")}<span class="dot"></span></a>`;}
+  const dev=DEVOIRS.filter(d=>d.due>=TODAY).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,14)
+    .map(d=>{const k=devKey(d); const ok=!!state.devoirs[k]||!!d.done;
       return `<li class="${ok?"ok":""}"><input type="checkbox" aria-label="Devoir fait" data-dev="${esc(k)}" ${ok?"checked":""}><span class="date">${fmt(d.due)}</span><div style="min-width:0">${chip(d.subj)}<div class="txt" style="margin-top:4px">${esc(d.text)}</div>${links(d.go)}</div></li>`;}).join("")||`<li>Aucun devoir à venir enregistré.</li>`;
   const rewards=LEVELS.map((l,i)=>`<div class="reward ${v>=l?"won":""}"><b>${l} XP</b>${v>=l?"Débloquée !":"Récompense "+(i+1)}</div>`).join("");
-  const doneCount=MISSIONS.filter(m=>state.done[m.date]).length;
-  return `<div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">${statusCard()}${hero}${revsCard()}${bossCard}</div>
+  return `<div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">${statusCard()}${soirCard(TODAY,true)}</div>
    <div style="display:grid;gap:18px;align-content:start;min-width:0">
-    <div class="card"><div class="eyebrow">Cette semaine</div><div class="week" style="margin-top:10px">${week}</div><p class="muted" style="margin:10px 0 0;font-size:13.5px">${doneCount} missions réussies sur ${MISSIONS.length}. <a href="#planning">Voir tout le planning</a></p></div>
+    ${evalsCard()}
+    <div class="card"><div class="eyebrow">Cette semaine</div><div class="week" style="margin-top:10px">${week}</div><p style="margin:10px 0 0;font-size:13.5px"><a href="#planning">Voir le programme de chaque soir</a></p></div>
     ${changesCard()}${newsCard()}${infosCard()}
-    <div class="card"><div class="eyebrow">Devoirs Pronote à venir</div><ul class="list dev" style="margin-top:10px">${dev}</ul><p style="margin:10px 0 0;font-size:13.5px"><a href="#fiches/maths/taf">Tout le travail donné depuis septembre, par matière</a></p></div>
-    <div class="card"><div class="eyebrow">Récompenses</div><div class="rewards" style="margin-top:10px">${rewards}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Choisies à l'avance avec maman. Mission = 10 XP, test blanc = 20, prête à J-2 = +30.</p></div>
+    <div class="card"><div class="eyebrow">Tous les devoirs à venir</div><ul class="list dev" style="margin-top:10px">${dev}</ul><p style="margin:10px 0 0;font-size:13.5px"><a href="#fiches/maths/taf">Tout le travail donné depuis septembre, par matière</a></p></div>
+    <div class="card"><div class="eyebrow">Récompenses</div><div class="rewards" style="margin-top:10px">${rewards}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Choisies à l'avance avec maman. Révision du soir = 10 XP, test blanc = 20.</p></div>
    </div></div>`;
 }
 let selDay=null;
 function vPlanning(){
-  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour de boss · « prête ! » = objectif atteint 2 jours avant. Chaque case montre la mission et les devoirs Pronote à faire ce soir-là pour le lendemain. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
+  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour d'évaluation · « prête ! » = objectif atteint 2 jours avant. Chaque case montre la mission et les devoirs Pronote à faire ce soir-là pour le lendemain. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
   ["LUN","MAR","MER","JEU","VEN","SAM","DIM"].forEach(h=>html+=`<div class="hd">${h}</div>`);
   for(let w=0;w<5;w++){
     html+=`<div class="weekhead">Semaine ${w+1}</div>`;
@@ -136,23 +116,22 @@ function vPlanning(){
       if(!m){html+=`<div class="day empty" style="${sc("autre")}"><span class="d">${fmt(s)}</span><span class="s">${holidayOf(s)?"Vacances":"Libre"}</span></div>`;continue;}
       const b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
       html+=`<button class="day ${b?"isboss":""} ${s===TODAY?"today":""} ${state.done[s]?"done":""} ${s<TODAY?"past":""} ${s===(selDay||TODAY)?"sel":""}" style="${sc(m.subj)}" data-day="${s}" aria-label="${fmtLong(s)} : ${esc(m.title)}">
-        <span class="d">${fmt(s)}</span>${b?`<span class="tag">BOSS ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span>${(()=>{const n=devoirsSoir(s).list.length; return n?`<span class="dv">+ ${n} devoir${n>1?"s":""} pour ${fmt(nextClassDay(s)).split(" ")[0]}</span>`:"";})()}</button>`;}
+        <span class="d">${fmt(s)}</span>${b?`<span class="tag">ÉVAL. ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span>${(()=>{const n=devoirsSoir(s).list.length; return n?`<span class="dv">+ ${n} devoir${n>1?"s":""} pour ${fmt(nextClassDay(s)).split(" ")[0]}</span>`:"";})()}</button>`;}
   }
   html+=`</div>`;
-  const m=MISSIONS.find(x=>x.date===(selDay||TODAY))||MISSIONS.find(x=>x.date>=TODAY);
-  if(m) html+=missionCard(m,false);
+  html+=soirCard(selDay||TODAY,false);
   return html;
 }
 function vBoss(){
   const sorted=[...BOSSES].filter(b=>!b.date||diff(b.date,TODAY)<=21).sort((a,b)=>(a.date||a.ready).localeCompare(b.date||b.ready));
   const card=b=>{const n=b.date?diff(TODAY,b.date):null; const ready=diff(TODAY,b.ready);
     const pr=bossPrep(b); let st= b.date&&n<0?`<span class="pill">Passé</span>`: ready<=0?(pr.total&&pr.done<pr.total?`<span class="pill warn">Révisions à rattraper : ${pr.done}/${pr.total}</span>`:`<span class="pill good">Prête ✓${pr.total?" "+pr.done+"/"+pr.total+" révisions":""}</span>`): `<span class="pill warn">Objectif « prête » dans ${ready} j${pr.total?" · "+pr.done+"/"+pr.total+" révisions faites":""}</span>`;
-    return `<div class="card bcard" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden?`<span class="pill">caché</span>`:""}</div><h3>${esc(b.title)}</h3>
-    <div class="meta"><span><span class="muted">Combat</span><br><b>${b.date?fmt(b.date):"pas encore annoncé"}</b>${b.when?`<br><span class="muted">${esc(b.when)}</span>`:""}</span><span style="text-align:right"><span class="muted">Prête le</span><br><b>${fmt(b.ready)}</b></span></div>
+    return `<div class="card bcard" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden||!b.date?`<span class="pill">date à confirmer</span>`:""}</div><h3>${esc(b.title)}</h3>
+    <div class="meta"><span><span class="muted">Évaluation</span><br><b>${b.date?fmt(b.date):"pas encore annoncé"}</b>${b.when?`<br><span class="muted">${esc(b.when)}</span>`:""}</span><span style="text-align:right"><span class="muted">Prête le</span><br><b>${fmt(b.ready)}</b></span></div>
     <p class="muted" style="margin:0;font-size:14px">${esc(b.know)}</p><div class="row">${st}</div>${links(b.go)}</div>`;};
   const past=PASSED.map(p=>`<li><span class="date">${fmt(p[0])}</span><div style="min-width:0">${chip(p[1])}<div style="margin-top:4px">${esc(p[2])}</div></div><b class="res">${esc(p[3])}</b></li>`).join("");
-  return `<div class="card"><h2 style="font-size:22px">Les boss à venir</h2><p class="muted" style="margin:6px 0 0">Les boss « cachés » n'ont pas encore de date sur Pronote, mais tu seras prête quand même. Chaque carte a ses liens pour réviser.</p></div><div class="bosses">${sorted.map(card).join("")}</div>
-  <div class="card"><div class="eyebrow">Boss déjà battus</div><ul class="list" style="margin-top:10px">${past}</ul><p class="muted" style="margin:10px 0 0;font-size:13px">Toutes les notes publiées sont dans <a href="#notes">Mes notes</a>.</p></div>`;
+  return `<div class="card"><h2 style="font-size:22px">Les évaluations à venir</h2><p class="muted" style="margin:6px 0 0">Toutes les évaluations annoncées sur Pronote (ou prévues par les profs), avec ce qu'il faut savoir et les documents pour réviser. « Date à confirmer » : le prof l'a annoncée mais pas encore datée sur Pronote.</p></div><div class="bosses">${sorted.map(card).join("")}</div>
+  <div class="card"><div class="eyebrow">Évaluations passées</div><ul class="list" style="margin-top:10px">${past}</ul><p class="muted" style="margin:10px 0 0;font-size:13px">Toutes les notes publiées sont dans <a href="#notes">Mes notes</a>.</p></div>`;
 }
 let selSubj="maths", selEx="maths";
 function switcher(list,cur,view){return `<div class="switch" role="group">${list.map(s=>`<a role="button" style="${sc(s)}" aria-pressed="${s===cur}" href="#${view}/${s}">${SUBJ[s].n}</a>`).join("")}</div>`;}
@@ -531,6 +510,57 @@ document.addEventListener("click",async e=>{
   else if(t.dataset.refresh) refreshLatest(true);
   else if(t.dataset.role){if(confirm(t.dataset.role==="parent"?"Passer cet appareil en mode parent (lecture seule) ?":"Passer cet appareil en appareil de "+(QG.base.NAME||"l'élève")+" ?")){QG.LS.set("qg-role",t.dataset.role); location.reload();}}
 });
+
+/* ============ PROGRAMME DU SOIR : 1. devoirs  2. révisions des évaluations  3. cours du jour ============ */
+const S_NUM=["①","②","③"];
+function evalsDans(d,jours){return BOSSES.filter(b=>b.date&&b.date>=d&&diff(d,b.date)<=jours).sort((a,b)=>a.date.localeCompare(b.date));}
+const quand=(d,x)=>{const n=diff(d,x); return n===0?"aujourd'hui":n===1?"demain":"dans "+n+" jours";};
+function coursDuJour(d){return CDT.cdt.filter(e=>e.d===d&&(e.t||e.x));}
+function secDevoirs(d){
+  const {next,list}=devoirsSoir(d);
+  let body;
+  if(!next){const n=nextClassDay(d), k=DEVOIRS.filter(x=>x.due===n).length; body=`<p class="muted s-empty">Rien ce soir (vendredi). ${k?`Les ${k} devoir${k>1?"s":""} pour ${fmtLong(n)} sont à faire ce week-end.`:`Rien pour ${fmtLong(n)} sur Pronote.`}</p>`;}
+  else if(!list.length) body=`<p class="muted s-empty">Aucun devoir pour ${fmtLong(next)} sur Pronote.</p>`;
+  else body=`<ul class="list dev">${list.map(x=>{const k=devKey(x), ok=!!state.devoirs[k]||!!x.done; return `<li class="${ok?"ok":""}"><input type="checkbox" aria-label="Devoir fait" data-dev="${esc(k)}" ${ok?"checked":""}><div style="min-width:0">${chip(x.subj)}<div class="txt" style="margin-top:4px">${esc(x.text)}</div>${links(x.go)}</div></li>`;}).join("")}</ul>`;
+  const done=list.filter(x=>state.devoirs[devKey(x)]||x.done).length;
+  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[0]}</span><h3>Les devoirs${next?" pour "+fmtLong(next):""}</h3>${list.length?`<span class="pill ${done===list.length?"good":"warn"}">${done}/${list.length} faits</span>`:""}</div>${body}</section>`;
+}
+function secRevisions(d){
+  const m=MISSIONS.find(x=>x.date===d), ev=evalsDans(d,10), R=(LATEST&&LATEST.revs||[]).filter(r=>r.date===d);
+  const evl=ev.length?`<div class="s-evals">${ev.map(b=>`<a href="#boss" class="s-eval" style="${sc(b.subj)}"><b>${esc(SUBJ[b.subj]?SUBJ[b.subj].n.split(" (")[0]:b.subj)}</b> · ${esc(b.title)}<span>${fmt(b.date)} · ${quand(d,b.date)}</span></a>`).join("")}</div>`:`<p class="muted s-empty">Aucune évaluation annoncée dans les 10 prochains jours.</p>`;
+  let mis="";
+  if(m){const done=!!state.done[m.date], b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
+    mis=`<div class="s-mission" style="${sc(m.subj)}"><div class="row">${chip(m.subj)}<span class="pill">+${m.xp} XP</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : être prête pour ${esc(r.title)}</span>`:""}</div>
+      <p class="s-mtitle">${esc(m.title)}</p><div class="where"><b>Avec :</b> ${esc(m.where||"")}${links(m.go)}</div>
+      <button class="btn ${done?"done":""}" data-done="${m.date}">${done?"✓ Révision faite":"J'ai fini ma révision"}</button></div>`;}
+  else if(holidayOf(d)) mis=`<p class="muted s-empty">Vacances : pas de révision prévue.</p>`;
+  else mis=`<p class="muted s-empty">Pas de révision prévue ce jour-là.</p>`;
+  const rv=R.length?`<ul class="checks" style="margin-top:8px">${R.map(r=>`<li><label><input type="checkbox" data-check="${esc(r.id)}" ${state.checks[r.id]?"checked":""}><span>${chip(r.subj)} ${esc(r.t)}</span></label>${links(r.go)}</li>`).join("")}</ul>`:"";
+  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[1]}</span><h3>Réviser pour les évaluations qui arrivent</h3></div>${evl}${mis}${rv}</section>`;
+}
+function secCours(d){
+  const C=coursDuJour(d); let body;
+  if(d>TODAY) body=`<p class="muted s-empty">Les cours de ce jour s'afficheront le soir même, dès que les profs les auront notés sur Pronote.</p>`;
+  else if(!C.length) body=`<p class="muted s-empty">${dObj(d).getDay()%6===0||holidayOf(d)?"Pas de cours ce jour-là.":"Aucun cours noté sur Pronote pour ce jour (pour l'instant)."}</p>`;
+  else{const n=C.filter((e,i)=>state.checks["cours:"+d+":"+i]).length;
+    body=`<p class="muted" style="margin:0 0 8px;font-size:13.5px">5 minutes par matière : relis ce qui a été fait en classe aujourd'hui, pour rester à jour. ${n}/${C.length} relus.</p><ul class="checks">${C.map((e,i)=>{const k="cours:"+d+":"+i; return `<li><label><input type="checkbox" data-check="${k}" ${state.checks[k]?"checked":""}><span>${chip(e.s)} ${esc(e.t)}${e.c?` <span class="muted">(${esc(e.c)})</span>`:""}</span></label> <a class="s-link" href="#fiches/${FICHES[e.s]?e.s:"maths"}/cdt">voir le cours</a></li>`;}).join("")}</ul>`;}
+  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[2]}</span><h3>Relire les cours du jour</h3></div>${body}</section>`;
+}
+function soirCard(d,big){
+  const hol=holidayOf(d);
+  if(hol&&!MISSIONS.find(x=>x.date===d)) return `<div class="card soir" style="${sc("autre")}"><div class="eyebrow">${fmtLong(d)}</div><h2>${esc(hol.n||"Vacances")}</h2><p class="muted">Retour en classe après le ${fmtLong(hol.end)}.${d>"2026-12-18"&&d<"2027-01-04"?" Une seule chose pendant ces vacances : commencer Brooklyn de Colm Tóibín (à lire pour le 1er février).":""}</p>${secDevoirs(d)}</div>`;
+  return `<div class="card soir"><div class="eyebrow">${big?"Mon programme de ce soir":"Programme du soir"} · ${fmtLong(d)}</div>
+   <p class="muted" style="margin:4px 0 0;font-size:13.5px">Dans l'ordre : ${S_NUM[0]} les devoirs, ${S_NUM[1]} les révisions, ${S_NUM[2]} la relecture des cours.</p>
+   ${secDevoirs(d)}${secRevisions(d)}${secCours(d)}</div>`;
+}
+function evalsCard(){
+  const E=BOSSES.filter(b=>b.date&&b.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
+  const N=BOSSES.filter(b=>!b.date&&b.ready>=TODAY).sort((a,b)=>a.ready.localeCompare(b.ready));
+  const li=E.map(b=>{const pr=bossPrep(b); return `<li><span class="date">${fmt(b.date)}</span><div style="min-width:0">${chip(b.subj)}<div class="txt" style="margin-top:4px"><b>${esc(b.title)}</b>${b.when?` · <span class="muted">${esc(b.when)}</span>`:""}</div><div class="muted" style="font-size:13px;margin-top:2px">${quand(TODAY,b.date)} · être prête le ${fmt(b.ready)}${pr.total?` · révisions faites ${pr.done}/${pr.total}`:""}</div></div></li>`;}).join("")||"<li>Aucune évaluation annoncée sur Pronote pour l'instant.</li>";
+  return `<div class="card"><div class="eyebrow">Prochaines évaluations</div><ul class="list" style="margin-top:10px">${li}</ul>
+   ${N.length?`<p class="muted" style="margin:10px 0 0;font-size:13.5px"><b>Prévues, date pas encore donnée :</b> ${N.map(b=>`${esc(SUBJ[b.subj]?SUBJ[b.subj].n.split(" (")[0]:b.subj)} (${esc(b.title)})`).join(", ")}. Les révisions sont déjà dans le planning.</p>`:""}
+   <p style="margin:10px 0 0;font-size:13.5px"><a href="#boss">Le détail de chaque évaluation : quoi réviser, avec quels documents</a></p></div>`;
+}
 
 /* ============ NAVIGATION ============ */
 const VIEWS={aujourdhui:vAujourdhui,planning:vPlanning,boss:vBoss,fiches:vFiches,cartes:vCartes,exercices:vExercices,notes:vNotes,suivi:vSuivi,reglages:vReglages};

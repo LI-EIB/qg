@@ -59,9 +59,9 @@ export function transform(raw, base, files, seen, now) {
   };
   const isNew = (kind, id) => (seen[kind] && seen[kind][id] ? seen[kind][id] >= addDays(today, -6) && seen[kind][id] !== "init" : false);
 
-  const fref = (a, s) => {
+  const fref = (a, s, d) => {
     if (a.kind === "link") return { n: a.name || a.url, u: a.url };
-    const f = files[attKey(a)];
+    const f = files[attKey(a, s, d)];
     return f ? { n: f.n, k: f.k, e: f.ext } : { n: a.name, p: 1 };
   };
 
@@ -73,8 +73,8 @@ export function transform(raw, base, files, seen, now) {
     const h = `${hm(r.start)} à ${hm(r.end)}`;
     const contents = r.contents.length ? r.contents : [{ id: r.id, title: "", description: "", categoryText: "", files: [] }];
     for (const c of contents) {
-      const e = { id: c.id, d, s, sn: r.subject, h, t: c.title || c.categoryText || "Séance", c: c.categoryText || "", x: htmlToText(c.description), a: [], pj: [], f: c.files.map((a) => fref(a, s)), cat: c.category };
-      if (firstSeen("cdt", c.id, d)) ev.push({ type: "cdt", s, title: e.t, d });
+      const e = { id: c.id, d, s, sn: r.subject, h, t: c.title || c.categoryText || "Séance", c: c.categoryText || "", x: htmlToText(c.description), a: [], pj: [], f: c.files.map((a) => fref(a, r.subject, d)), cat: c.category, id: sid("c", d, s, h, c.title || c.categoryText || "", c.description) };
+      if (firstSeen("cdt", e.id, d)) ev.push({ type: "cdt", s, title: e.t, d });
       e.nv = isNew("cdt", c.id);
       cdt.push(e);
     }
@@ -86,8 +86,8 @@ export function transform(raw, base, files, seen, now) {
   for (const a of raw.assignments || []) {
     const s = subjKey(a.subject); const due = parisDate(a.deadline);
     const r = a.resourceID && resById[a.resourceID];
-    const w = { id: a.id, due, s, sn: a.subject, g: r ? frDay(parisDate(r.start)) : "", st: a.done ? "Fait" : "Non Fait", done: !!a.done, x: htmlToText(a.description), a: [], pj: [], f: a.attachments.map((x) => fref(x, s)) };
-    if (firstSeen("taf", a.id, due) && due >= today) ev.push({ type: "taf", s, due, text: w.x });
+    const w = { id: a.id, due, s, sn: a.subject, g: r ? frDay(parisDate(r.start)) : "", st: a.done ? "Fait" : "Non Fait", done: !!a.done, x: htmlToText(a.description), a: [], pj: [], f: a.attachments.map((x) => fref(x, a.subject, due)), id: sid("t", due, s, a.description) };
+    if (firstSeen("taf", w.id, due) && due >= today) ev.push({ type: "taf", s, due, text: w.x });
     w.nv = isNew("taf", a.id);
     taf.push(w);
   }
@@ -111,7 +111,7 @@ export function transform(raw, base, files, seen, now) {
   const notes = [];
   for (const g of raw.grades || []) {
     const s = subjKey(g.subject); const v = pts(g.value), o = pts(g.outOf);
-    if (firstSeen("grade", g.id, parisDate(g.date))) ev.push({ type: "grade", s, v, o, avg: pts(g.average), t: g.comment });
+    if (firstSeen("grade", sid("g", parisDate(g.date), s, g.comment, JSON.stringify(g.value), JSON.stringify(g.outOf)), parisDate(g.date))) ev.push({ type: "grade", s, v, o, avg: pts(g.average), t: g.comment });
     if (v == null || !o) continue;
     notes.push([parisDate(g.date), s, g.comment || "Évaluation", v, o, pts(g.average)]);
   }
@@ -134,7 +134,7 @@ export function transform(raw, base, files, seen, now) {
     if (d < today || d > addDays(today, 14) || !(l.canceled || l.status)) continue;
     const s = subjKey(l.subject);
     const label = l.status || (l.canceled ? "Cours annulé" : "Changement");
-    const id = `${l.id}:${label}`;
+    const id = sid("e", l.start, l.subject, label);
     const c = { id, date: d, s, sn: l.subject, h: `${hm(l.start)}–${hm(l.end)}`, label, canceled: !!l.canceled };
     if (firstSeen("change", id, d)) ev.push({ type: "change", ...c });
     changes.push(c);
@@ -143,8 +143,9 @@ export function transform(raw, base, files, seen, now) {
 
   // ---------- informations du collège ----------
   const news = (raw.news || []).filter((n) => n.date && parisDate(n.date) >= addDays(today, -45)).map((n) => {
-    const x = { id: n.id, d: parisDate(n.date), t: n.title || "Information", a: n.author || "", cat: n.category || "", x: cut(htmlToText(n.content), 1500), f: (n.attachments || []).map((a) => fref(a, "autre")) };
-    if (firstSeen("news", n.id, x.d)) ev.push({ type: "news", t: x.t, a: x.a });
+    const x = { id: n.id, d: parisDate(n.date), t: n.title || "Information", a: n.author || "", cat: n.category || "", x: cut(htmlToText(n.content), 1500), f: (n.attachments || []).map((a) => fref(a, "", parisDate(n.date))) };
+    x.id = sid("n", x.d, x.t, x.a);
+    if (firstSeen("news", x.id, x.d)) ev.push({ type: "news", t: x.t, a: x.a });
     return x;
   }).sort((a, b) => b.d.localeCompare(a.d));
 
@@ -233,4 +234,13 @@ export function transform(raw, base, files, seen, now) {
   };
 }
 
-export const attKey = (a) => `${a.id}|${nfc(a.name)}`;
+// Les identifiants Pronote changent à chaque connexion : on fabrique des identifiants stables.
+export const attKey = (a, subject, date) => `${nfc(a.name)}|${subj(subject)}|${date || ""}`;
+const subj = (x) => String(x || "").normalize("NFC").trim().toUpperCase();
+function sid(...parts) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57; const str = parts.map((x) => String(x ?? "")).join("\u0001");
+  for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return parts[0] + (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+}

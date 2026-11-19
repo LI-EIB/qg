@@ -28,6 +28,11 @@ const stateFile = path.join(STATE_DIR, "state.enc");
 let state = fs.existsSync(stateFile) ? await unsealJSON(keys.data, fs.readFileSync(stateFile)) : {};
 state.deviceUUID ||= globalThis.crypto.randomUUID();
 state.files ||= {}; state.seen ||= {}; state.sent ||= {};
+if (state.v !== 2) { // v2 : identifiants stables (ceux de Pronote changent à chaque connexion)
+  state.v = 2; state.files = {}; state.seen = {};
+  for (const f of fs.readdirSync(path.join(STATE_DIR, "files"))) fs.rmSync(path.join(STATE_DIR, "files", f));
+  log("Mise à niveau de l'état du robot (identifiants stables)");
+}
 if (!state.vapid) { state.vapid = webpush.generateVAPIDKeys(); log("Clés de notification créées"); }
 const repo = env.GITHUB_REPOSITORY || "";
 state.vapidSubject = repo ? `https://${repo.split("/")[0].toLowerCase()}.github.io` : "https://github.com";
@@ -95,7 +100,7 @@ function soffice() {
   if (sofficeReady !== null) return sofficeReady;
   const find = () => { try { return execSync("command -v soffice || command -v libreoffice", { encoding: "utf8" }).trim().split("\n")[0]; } catch { return ""; } };
   let bin = find();
-  if (!bin && env.CI) { try { log("Installation de LibreOffice pour convertir les .docx en PDF…"); execSync("sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libreoffice-writer libreoffice-impress libreoffice-calc >/dev/null", { stdio: "inherit", timeout: 600e3 }); bin = find(); } catch (e) { log("⚠ LibreOffice indisponible"); } }
+  if (!bin && env.CI && state.sofficeTry !== parisDate(NOW)) { state.sofficeTry = parisDate(NOW); try { log("Installation de LibreOffice pour convertir les .docx en PDF…"); execSync("sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libreoffice-writer libreoffice-impress libreoffice-calc >/dev/null", { stdio: "inherit", timeout: 180e3 }); bin = find(); } catch (e) { log("⚠ LibreOffice indisponible"); } }
   return (sofficeReady = bin);
 }
 function toPdf(buf, name) {
@@ -107,14 +112,14 @@ function toPdf(buf, name) {
 }
 if (raw && session) {
   const all = [];
-  for (const a of raw.assignments) for (const x of a.attachments) all.push([x, a.subject]);
-  for (const r of raw.resources) for (const c of r.contents) for (const x of c.files) all.push([x, r.subject]);
-  for (const n of raw.news) for (const x of n.attachments || []) all.push([x, ""]);
-  for (const g of raw.grades) for (const x of [g.correction, g.subjectFile]) if (x) all.push([x, g.subject]);
+  for (const a of raw.assignments) for (const x of a.attachments) all.push([x, a.subject, parisDate(a.deadline)]);
+  for (const r of raw.resources) for (const c of r.contents) for (const x of c.files) all.push([x, r.subject, parisDate(r.start)]);
+  for (const n of raw.news) for (const x of n.attachments || []) all.push([x, "", n.date ? parisDate(n.date) : ""]);
+  for (const g of raw.grades) for (const x of [g.correction, g.subjectFile]) if (x) all.push([x, g.subject, parisDate(g.date)]);
   let got = 0, bytes = 0, failed = 0;
-  for (const [a, subj] of all) {
+  for (const [a, subj, ctx] of all) {
     if (a.kind !== "file") continue;
-    const ak = attKey(a); if (state.files[ak]) continue;
+    const ak = attKey(a, subj, ctx); if (state.files[ak]) continue;
     if (got >= 120 || bytes > 250e6) break; // le reste au prochain passage
     try {
       let buf = await P.download(session, a); let n = nfc(a.name), ext = (path.extname(n).slice(1) || "bin").toLowerCase(), conv = false;
@@ -169,5 +174,9 @@ for (const f of fs.readdirSync(path.join(STATE_DIR, "files"))) {
 }
 fs.writeFileSync(path.join(OUT, "data", "latest.enc"), await sealJSON(keys.data, content));
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
+{ // ménage : documents qui ne sont plus référencés
+  const live = new Set(Object.values(state.files).map((f) => f.k + ".enc"));
+  for (const f of fs.readdirSync(path.join(STATE_DIR, "files"))) if (!live.has(f)) fs.rmSync(path.join(STATE_DIR, "files", f));
+}
 await saveState();
 log(raw ? "Synchro terminée." : "Site publié sans nouvelles données Pronote : " + syncErr);

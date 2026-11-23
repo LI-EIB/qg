@@ -162,6 +162,13 @@ export function transform(raw, base, files, seen, now) {
     if (o.when && !c.when) c.when = o.when; if (o.files) c.files.push(...o.files);
   };
   for (const l of raw.lessons || []) if (l.test && !l.canceled) addCand(subjKey(l.subject), parisDate(l.start), { src: "edt", when: `${hm(l.start)}–${hm(l.end)}`, title: "Contrôle" });
+  // Épreuves communes, examens blancs… posés dans l'emploi du temps comme des cours « exceptionnels »
+  for (const l of raw.lessons || []) {
+    if (l.canceled || !/EPREUVE|\bECE\b|EXAMEN|BREVET BLANC|DEVOIR COMMUN|BAC BLANC/i.test(l.subject + " " + l.status)) continue;
+    const d = parisDate(l.start), k = `${d}:autre`, w = `${hm(l.start)}–${hm(l.end)}`;
+    addCand("autre", d, { src: "edt", title: /ECE|EPREUVE COMMUNE/i.test(l.subject) ? "Épreuves communes (ECE)" : "Examen", know: "Épreuve(s) inscrite(s) dans l'emploi du temps Pronote." });
+    const c = cand[k]; if (c && !c.when.includes(w)) c.when = c.when ? c.when + ", " + w : w;
+  }
   for (const e of cdt) if (EVAL_CATS[e.cat]) addCand(e.s, e.d, { src: "cdt", title: e.c || EVAL_CATS[e.cat], know: cut([e.t, e.x].filter(Boolean).join(" : "), 260), files: e.f });
   for (const w of taf) {
     if (!EVAL_RE.test(w.x)) continue;
@@ -185,7 +192,7 @@ export function transform(raw, base, files, seen, now) {
     if (base.CARDS && base.CARDS[c.s]) go.push("cartes:" + c.s);
     if (base.EX && base.EX[c.s] && base.EX[c.s].length) go.push(`ex:${c.s}:0`);
     for (const f of c.files) if (f.k) go.push(`file:${f.k}|${f.n}`);
-    const b = { id: `auto-${c.date}-${c.s}`, subj: c.s, title: `${c.title || "Contrôle"} de ${name}`, date: c.date, ready, when: c.when, know: c.know || `Revois le cahier de textes de ${name} depuis le dernier contrôle, puis la fiche et les cartes.`, go, auto: true, src: c.srcs };
+    const b = { id: `auto-${c.date}-${c.s}`, subj: c.s, title: c.s === "autre" ? (c.title || "Évaluation") : `${c.title || "Contrôle"} de ${name}`, date: c.date, ready, when: c.when, know: c.know || `Revois le cahier de textes de ${name} depuis le dernier contrôle, puis la fiche et les cartes.`, go, auto: true, src: c.srcs };
     if (firstSeen("boss", b.id, c.date) && c.date >= today) ev.push({ type: "boss", s: c.s, title: b.title, date: c.date, ready });
     bosses.push(b);
   }

@@ -124,10 +124,10 @@ function vPlanning(){
   return html;
 }
 function vBoss(){
-  const sorted=[...BOSSES].filter(b=>!b.date||diff(b.date,TODAY)<=21).sort((a,b)=>(a.date||a.ready).localeCompare(b.date||b.ready));
+  const isPast=b=>b.date&&b.date<TODAY; const sorted=[...BOSSES].filter(b=>!b.date||diff(b.date,TODAY)<=30).sort((a,b)=>(isPast(a)-isPast(b))||(isPast(a)?(b.date).localeCompare(a.date):(a.date||a.ready).localeCompare(b.date||b.ready)));
   const card=b=>{const n=b.date?diff(TODAY,b.date):null; const ready=diff(TODAY,b.ready);
     const pr=bossPrep(b); let st= b.date&&n<0?`<span class="pill">Passé</span>`: ready<=0?(pr.total&&pr.done<pr.total?`<span class="pill warn">Révisions à rattraper : ${pr.done}/${pr.total}</span>`:`<span class="pill good">Prête ✓${pr.total?" "+pr.done+"/"+pr.total+" révisions":""}</span>`): `<span class="pill warn">Objectif « prête » dans ${ready} j${pr.total?" · "+pr.done+"/"+pr.total+" révisions faites":""}</span>`;
-    return `<div class="card bcard" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden||!b.date?`<span class="pill">date à confirmer</span>`:""}</div><h3>${esc(b.title)}</h3>
+    return `<div class="card bcard ${isPast(b)?"passe":""}" style="${sc(b.subj)}"><div class="row" style="justify-content:space-between">${chip(b.subj)}${b.hidden||!b.date?`<span class="pill">date à confirmer</span>`:""}</div><h3>${esc(b.title)}</h3>
     <div class="meta"><span><span class="muted">Évaluation</span><br><b>${b.date?fmt(b.date):"pas encore annoncé"}</b>${b.when?`<br><span class="muted">${esc(b.when)}</span>`:""}</span><span style="text-align:right"><span class="muted">Prête le</span><br><b>${fmt(b.ready)}</b></span></div>
     <p class="muted" style="margin:0;font-size:14px">${esc(b.know)}</p><div class="row">${st}</div>${links((b.go||[]).concat(CARDS[b.subj]&&!(b.go||[]).includes("cartes:"+b.subj)?["cartes:"+b.subj]:[]).concat(CARDS[b.subj]?["quiz:"+b.subj]:[]))}</div>`;};
   const past=PASSED.map(p=>`<li><span class="date">${fmt(p[0])}</span><div style="min-width:0">${chip(p[1])}<div style="margin-top:4px">${esc(p[2])}</div></div><b class="res">${esc(p[3])}</b></li>`).join("");

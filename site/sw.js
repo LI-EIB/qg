@@ -1,5 +1,5 @@
 /* Le QG : fonctionne hors connexion et reçoit les notifications même quand le QG est fermé. */
-const V="qg-b03fa8a3d6";
+const V="qg-3379487ef8";
 const SHELL=["./","index.html","boot.js","app.js","manifest.webmanifest","icon-192.png","icon-512.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith("qg-")&&k!==V&&k!=="qg-files").map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

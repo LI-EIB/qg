@@ -189,7 +189,7 @@ function vExercices(){
   const s=selEx, list=EX[s];
   const prof=docsBlock(s,["exos","corrigé"]);
   return `${switcher(Object.keys(EX),s,"exercices")}<p class="muted" style="margin:0">Fais l'exercice sur une feuille, sans regarder la fiche, puis ouvre le corrigé. <a href="#fiches/${s}">Revoir la fiche ${esc(SUBJ[s].n)}</a></p>
-  ${list.map((e,i)=>`<div class="card ex" id="ex-${s}-${i}" style="${sc(s)};border-left:6px solid var(--sc)"><h3 style="font-size:18px">${e.t}</h3><div class="q">${e.q}</div>
+  ${list.map((e,i)=>`<div class="card ex" id="ex-${s}-${i}" style="${sc(s)};border-left:6px solid var(--sc)"><div class="exhead"><h3 style="font-size:18px">${e.t}</h3>${e.w?`<span class="oeuvre">${esc(e.w)}</span>`:""}</div><div class="q">${e.q}</div>
   <details class="answer"><summary style="cursor:pointer;font-weight:800">Voir le corrigé</summary><div style="margin-top:8px">${e.a}</div></details></div>`).join("")}
   ${prof?`<div class="card" style="${sc(s)}"><div class="eyebrow">Les feuilles d'exercices du professeur</div><p class="muted" style="margin:6px 0 10px;font-size:13.5px">À faire aussi, avec les corrigés quand ils existent.</p>${prof}</div>`:""}`;
 }

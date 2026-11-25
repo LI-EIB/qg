@@ -538,10 +538,10 @@ function secDevoirs(d){
 }
 function secRevisions(d){
   const m=MISSIONS.find(x=>x.date===d), ev=evalsDans(d,10), R=(LATEST&&LATEST.revs||[]).filter(r=>r.date===d);
-  const evl=ev.length?`<div class="s-evals">${ev.map(b=>`<a href="#boss" class="s-eval" style="${sc(b.subj)}"><b>${esc(SUBJ[b.subj]?SUBJ[b.subj].n.split(" (")[0]:b.subj)}</b> · ${esc(b.title)}<span>${fmt(b.date)} · ${quand(d,b.date)}</span></a>`).join("")}</div>`:`<p class="muted s-empty">Aucune évaluation annoncée dans les 10 prochains jours.</p>`;
+  const evl=ev.length?`<p class="s-sub">Pour info, ce qui arrive (rien de plus à faire : ces révisions sont déjà réparties jour par jour dans le planning) :</p><div class="s-evals">${ev.map(b=>`<a href="#boss" class="s-eval" style="${sc(b.subj)}"><b>${esc(SUBJ[b.subj]?SUBJ[b.subj].n.split(" (")[0]:b.subj)}</b> · ${esc(b.title)}<span>${fmt(b.date)} · ${quand(d,b.date)}</span></a>`).join("")}</div>`:`<p class="muted s-empty">Aucune évaluation annoncée dans les 10 prochains jours.</p>`;
   let mis="";
   if(m){const done=!!state.done[m.date], b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
-    mis=`<div class="s-mission" style="${sc(m.subj)}"><div class="row">${chip(m.subj)}<span class="pill">+${m.xp} rubis</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : être prête pour ${esc(r.title)}</span>`:""}</div>
+    mis=`<div class="s-mission" style="${sc(m.subj)}"><div class="s-ce-soir">À faire ce soir, et seulement ça</div><div class="row">${chip(m.subj)}<span class="pill">+${m.xp} rubis</span>${b?`<span class="pill boss">Évaluation ce jour : ${esc(b.title)}</span>`:""}${r?`<span class="pill good">Objectif : être prête pour ${esc(r.title)}</span>`:""}</div>
       <p class="s-mtitle">${esc(m.title)}</p><div class="where"><b>Avec :</b> ${esc(m.where||"")}${links(m.go)}</div>
       <button class="btn ${done?"done":""}" data-done="${m.date}">${done?"✓ Révision faite":"J'ai fini ma révision"}</button></div>`;}
   else if(holidayOf(d)) mis=`<p class="muted s-empty">Vacances : pas de révision prévue.</p>`;
@@ -549,7 +549,7 @@ function secRevisions(d){
   const rv=R.length?`<ul class="checks" style="margin-top:8px">${R.map(r=>`<li><label><input type="checkbox" data-check="${esc(r.id)}" ${state.checks[r.id]?"checked":""}><span>${chip(r.subj)} ${esc(r.t)}</span></label>${links(r.go)}</li>`).join("")}</ul>`:"";
   const nc=d===TODAY?cartesDuJour():0;
   const cj=nc?`<p style="margin:10px 0 0;font-size:14px"><b>Bonus 5 min :</b> <a href="#cartes">${nc} carte${nc>1?"s":""} mémoire à revoir aujourd'hui</a> · <a href="#quiz">faire un quiz</a></p>`:"";
-  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[1]}</span><h3>Réviser pour les évaluations qui arrivent</h3></div>${evl}${mis}${rv}${cj}</section>`;
+  return `<section class="s-sec"><div class="s-head"><span class="s-num">${S_NUM[1]}</span><h3>Réviser pour les évaluations qui arrivent</h3></div>${mis}${rv}${cj}${evl}</section>`;
 }
 function secCours(d){
   const C=coursDuJour(d); let body;

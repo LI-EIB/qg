@@ -120,6 +120,11 @@ export async function fetchAll(session, r) {
 
   await step("informations", async () => {
     const n = await pronote.news(session);
+    // Schéma (noms de champs et types seulement, aucune donnée) pour adapter la lecture si Pronote change
+    const shape = (v, d = 0) => v == null ? null : Array.isArray(v) ? (d > 4 ? "[…]" : [v.length, v[0] === undefined ? null : shape(v[0], d + 1)]) : typeof v === "object" ? (d > 4 ? "{…}" : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shape(x, d + 1)]))) : typeof v === "string" ? "str" + v.length : typeof v;
+    const sample = n.items.filter(Boolean).find((x) => x.is === "information" && !String(x.content || "").trim());
+    const raw_ = sample && /** @type {any} */ (sample)._raw;
+    if (raw_) r.log("Schéma d'une information sans texte : " + JSON.stringify(shape(raw_)).slice(0, 3500));
     out.news = n.items.filter(Boolean).map((x) => ({
       id: x.id, is: x.is, title: x.title || "", author: x.author || "", date: iso(x.startDate || x.creationDate), category: x.category ? x.category.name : "",
       content: x.is === "information" ? x.content : x.questions.map((q) => q.content).join("\n"),

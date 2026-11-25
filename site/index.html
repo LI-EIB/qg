@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-v="2ed9ef7288">
+<html lang="fr" data-v="d038399c66">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -313,6 +313,14 @@ mark{background:#ffe27a;color:#111;border-radius:3px;padding:0 1px}
 .exhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
 .exhead h3{margin:0;flex:1;min-width:200px}
 .oeuvre{flex:none;font-size:13px;font-weight:800;font-style:italic;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--sc) 14%,var(--surface));color:var(--sc);border:1px solid color-mix(in srgb,var(--sc) 40%,transparent)}
+.day.past{position:relative;opacity:.55!important}
+.day.past .d,.day.past .s,.day.past .t,.day.past .tag{text-decoration:line-through;text-decoration-thickness:2px}
+.day.past::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 1px),color-mix(in srgb,var(--ink-2) 55%,transparent) calc(50% - 1px),color-mix(in srgb,var(--ink-2) 55%,transparent) calc(50% + 1px),transparent calc(50% + 1px))}
+.day.past.done{opacity:.7!important}
+.weekhead.past{color:var(--ink-2);text-decoration:line-through;text-decoration-thickness:2px}
+.wtag{display:inline-block;margin-left:8px;font-family:var(--f-body);font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);text-decoration:none;vertical-align:2px}
+.weekhead.past .wtag{text-decoration:none}
+.wtag.now{background:var(--accent);color:var(--accent-ink)}
 
 </style>
 </head>
@@ -362,6 +370,6 @@ mark{background:#ffe27a;color:#111;border-radius:3px;padding:0 1px}
   <div class="foot"><span class="sync" id="sync">Progrès enregistrés sur cet appareil</span><span id="upd"></span></div>
 </main>
 </div>
-<script src="boot.js?v=2ed9ef7288"></script>
+<script src="boot.js?v=d038399c66"></script>
 </body>
 </html>

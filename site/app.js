@@ -659,7 +659,7 @@ function sacCard(){
     .concat(["Trousse complète, agenda, gourde"]);
   return `<div class="card"><div class="eyebrow">Mon emploi du temps et mon sac pour ${fmtLong(d)}</div>
    ${ev.length?`<p class="warnmsg" style="margin:8px 0 0">Évaluation ce jour-là : ${ev.map(b=>esc(b.title)).join(", ")}</p>`:""}
-   <ul class="list edt" style="margin-top:10px">${L.map(l=>`<li class="${l.x?"ko":""}"><span class="date">${esc(l.h1)}–${esc(l.h2)}</span><div style="min-width:0">${SUBJ[l.s]&&l.s!=="autre"?chip(l.s):`<span class="chip">${esc(l.sn||"Cours")}</span>`}<div class="muted" style="margin-top:3px;font-size:13px">${[l.room&&"salle "+l.room,l.prof].filter(Boolean).map(esc).join(" · ")}${l.st?` · <b>${esc(l.st)}</b>`:""}${l.t?` · <b>évaluation</b>`:""}</div></div></li>`).join("")}</ul>
+   <ul class="list edt" style="margin-top:10px">${L.map(l=>`<li class="${l.x?"ko":""}"><span class="date">${esc(l.h1)}–${esc(l.h2)}</span><div style="min-width:0">${SUBJ[l.s]&&l.s!=="autre"?chip(l.s):`<span class="chip">${esc(l.sn||"Cours")}</span>`}<div class="muted" style="margin-top:3px;font-size:13px">${[l.room&&"salle "+l.room,l.prof].filter(Boolean).map(esc).join(" · ")}${l.st?` · <b>${esc(l.st)}</b>`:""}${l.t?` · <b>évaluation</b>`:""}</div>${l.nt?`<div class="edtnote">📌 ${esc(l.nt)}</div>`:""}</div></li>`).join("")}</ul>
    <div class="eyebrow" style="margin-top:12px">Dans mon sac</div><ul class="checks" style="margin-top:6px">${items.map((t,i)=>{const k="sac:"+d+":"+i; return `<li><label><input type="checkbox" data-check="${k}" ${state.checks[k]?"checked":""}><span>${esc(t)}</span></label></li>`;}).join("")}</ul></div>`;
 }
 

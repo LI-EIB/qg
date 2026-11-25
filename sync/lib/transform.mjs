@@ -142,7 +142,7 @@ export function transform(raw, base, files, seen, now) {
   changes.sort((a, b) => (a.date + a.h).localeCompare(b.date + b.h));
 
   // ---------- emploi du temps (2 semaines) : pour « mon sac pour demain » ----------
-  const edt = (raw.lessons || []).map((l) => ({ d: parisDate(l.start), h1: hm(l.start), h2: hm(l.end), s: subjKey(l.subject), sn: l.subject, room: (l.rooms || []).join(", "), prof: (l.teachers || []).join(", "), x: l.canceled ? 1 : 0, st: l.status || "", t: l.test ? 1 : 0, k: parisParts(l.start).h * 60 + parisParts(l.start).m }))
+  const edt = (raw.lessons || []).map((l) => ({ d: parisDate(l.start), h1: hm(l.start), h2: hm(l.end), s: subjKey(l.subject), sn: l.subject, room: (l.rooms || []).join(", "), prof: (l.teachers || []).join(", "), x: l.canceled ? 1 : 0, st: l.status || "", t: l.test ? 1 : 0, nt: l.notes || "", k: parisParts(l.start).h * 60 + parisParts(l.start).m }))
     .filter((l) => l.d >= today && l.d <= addDays(today, 14)).sort((a, b) => a.d.localeCompare(b.d) || a.k - b.k);
 
   // ---------- informations du collège ----------

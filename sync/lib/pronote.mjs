@@ -114,7 +114,7 @@ export async function fetchAll(session, r) {
     pronote.parseTimetable(session, tt, { withCanceledClasses: true, withPlannedClasses: true, withSuperposedCanceledClasses: false });
     out.lessons = tt.classes.filter((c) => c.is === "lesson").map((c) => {
       const l = /** @type {import("@blockshub/pawnote-lts").TimetableClassLesson} */ (c);
-      return { id: l.id, start: iso(l.startDate), end: iso(l.endDate), subject: l.subject ? l.subject.name : "", canceled: !!l.canceled, status: l.status || "", test: !!l.test, exempted: !!l.exempted, teachers: l.teacherNames || [], rooms: l.classrooms || [] };
+      return { id: l.id, start: iso(l.startDate), end: iso(l.endDate), subject: l.subject ? l.subject.name : "", canceled: !!l.canceled, status: l.status || "", test: !!l.test, exempted: !!l.exempted, teachers: l.teacherNames || [], rooms: l.classrooms || [], notes: String(l.notes || "").trim() };
     });
   });
 

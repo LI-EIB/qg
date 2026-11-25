@@ -72,7 +72,7 @@ export async function fetchAll(session, r) {
     student: { name: res.name, className: res.className || "", establishment: res.establishmentName || "", kind: session.information.accountKind },
     holidays: (session.instance.holidays || []).map((h) => ({ name: h.name, start: iso(h.startDate), end: iso(h.endDate) })),
     yearStart: iso(session.instance.firstDate), yearEnd: iso(session.instance.lastDate),
-    assignments: [], resources: [], grades: [], averages: [], overall: null, lessons: [], news: [], errors,
+    assignments: [], resources: [], grades: [], averages: [], overall: null, lessons: [], news: [], messages: [], errors,
   };
 
   await step("travail à faire", async () => {
@@ -120,11 +120,25 @@ export async function fetchAll(session, r) {
 
   await step("informations", async () => {
     const n = await pronote.news(session);
-    out.news = n.items.map((x) => ({
+    out.news = n.items.filter(Boolean).map((x) => ({
       id: x.id, is: x.is, title: x.title || "", author: x.author || "", date: iso(x.startDate || x.creationDate), category: x.category ? x.category.name : "",
       content: x.is === "information" ? x.content : x.questions.map((q) => q.content).join("\n"),
       attachments: x.is === "information" ? x.attachments.map(att) : [],
     }));
+  });
+
+  // Messages des profs (Discussions) : lus sans les marquer comme lus, pour leurs documents joints
+  await step("messages", async () => {
+    const ds = await pronote.discussions(session);
+    const since = Date.now() - 150 * 864e5;
+    const list = ds.items.filter((d) => +d.date >= since && d.numberOfMessages > 0).sort((a, b) => +b.date - +a.date).slice(0, 40);
+    for (const d of list) {
+      const m = await pronote.discussionMessages(session, d, false);
+      for (const msg of m.sents) {
+        if (!msg.author) continue; // message envoyé par l'élève elle-même
+        out.messages.push({ id: msg.id, subject: d.subject || "", date: iso(msg.creationDate), author: msg.author.name || "", content: msg.content || "", attachments: (msg.files || []).map(att) });
+      }
+    }
   });
 
   return out;

@@ -102,7 +102,7 @@ function vAujourdhui(){
    <div style="display:grid;gap:18px;align-content:start;min-width:0">
     ${evalsCard()}
     <div class="card"><div class="eyebrow">Cette semaine</div><div class="week" style="margin-top:10px">${week}</div><p style="margin:10px 0 0;font-size:13.5px"><a href="#planning">Voir le programme de chaque soir</a></p></div>
-    ${changesCard()}${newsCard()}${infosCard()}
+    ${changesCard()}${newsCard()}${messagesCard()}${infosCard()}
     <div class="card"><div class="eyebrow">Tous les devoirs à venir</div><ul class="list dev" style="margin-top:10px">${dev}</ul><p style="margin:10px 0 0;font-size:13.5px"><a href="#fiches/maths/taf">Tout le travail donné depuis septembre, par matière</a></p></div>
     <div class="card"><div class="eyebrow">Récompenses</div><div class="rewards" style="margin-top:10px">${rewards}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Choisies à l'avance avec maman. Révision du soir = 10 rubis, test blanc = 20, quiz réussi (8/10) = 5.</p></div>
    </div></div>`;
@@ -297,18 +297,20 @@ function vNotes(){
 
 /* ============ DONNÉES PRONOTE EN DIRECT ============ */
 const BASE_DEVOIRS=DEVOIRS.slice(), BASE_NOTES=NOTES.slice();
-const normName=s=>String(s||"").normalize("NFC").replace(/\s*\(converti en PDF\)\s*$/,"").trim();
+const normName=s=>String(s||"").normalize("NFC").replace(/\s*\(converti en PDF\)\s*$/,"").replace(/\s+/g," ").trim().toLowerCase();
 function holidayOf(d){const H=(LATEST&&LATEST.holidays&&LATEST.holidays.length)?LATEST.holidays:(QG.base.HOLIDAYS||[]); return H.find(h=>d>=h.start&&d<=h.end)||null;}
 function fileKind(n,e){if(/^(mp3|m4a|wav|ogg|aac)$/.test(e)) return "audio"; if(/corr/i.test(n)) return "corrigé"; if(/exerc|entra[iî]n|\bTD\b|\bTP\b|fiche|interro|test|évaluation/i.test(n)) return "exos"; if(/cours|chapitre|leçon|lesson|séance|seance/i.test(n)) return "cours"; return "doc";}
 function applyContent(c,quiet){
   if(!c) return; LATEST=c;
-  const files=c.files||{}, byName=c.fileNames||{};
+  const files=c.files||{}, byName={}; for(const [n,k] of Object.entries(c.fileNames||{})) byName[normName(n)]=k;
   Object.values(DOCS).forEach(d=>{const k=byName[normName(d.o)]; if(k) d.fk=k;});
   if(c.cdtFull&&c.cdtFull.cdt&&c.cdtFull.cdt.length){CDT={cdt:c.cdtFull.cdt.map(e=>({a:[],pj:[],f:[],...e})),taf:(c.cdtFull.taf||[]).map(w=>({a:[],pj:[],f:[],...w}))};}
   /* documents déposés sur Pronote qui ne sont pas encore dans la bibliothèque du QG */
   const known=new Set(Object.values(DOCS).map(d=>d.fk).filter(Boolean)); const when={};
   CDT.cdt.forEach(e=>(e.f||[]).forEach(f=>{if(f.k&&!when[f.k]) when[f.k]={d:e.d,s:e.s};}));
   CDT.taf.forEach(w=>(w.f||[]).forEach(f=>{if(f.k&&!when[f.k]) when[f.k]={d:w.due,s:w.s};}));
+  (c.messages||[]).forEach(m=>(m.f||[]).forEach(f=>{if(f.k&&!when[f.k]) when[f.k]={d:m.d,s:m.s};}));
+  (c.news||[]).forEach(n=>(n.f||[]).forEach(f=>{if(f.k&&!when[f.k]) when[f.k]={d:n.d,s:"autre"};}));
   Object.entries(files).forEach(([k,f])=>{if(known.has(k)||!when[k]) return; const s=SUBJ[when[k].s]?when[k].s:"autre";
     DOCS["f-"+k]={n:f.n.replace(/\.[a-z0-9]{2,4}$/i,""),f:"x."+f.e,e:f.e,s,d:fmt(when[k].d),k:fileKind(f.n,f.e),o:f.n,fk:k,auto:1};});
   if(Array.isArray(c.devoirs)&&c.devoirs.length) DEVOIRS=c.devoirs.map(d=>({go:[],...d}));
@@ -381,6 +383,10 @@ function infosCard(){
   return `<div class="card"><div class="eyebrow">Infos du collège</div><div class="cdtlist" style="margin-top:10px">${N.map(n=>`<details class="cdt"><summary><span class="date">${fmt(n.d)}</span><span class="ttl">${esc(n.t)}</span></summary><div class="cdtx">${linkify(n.x||"")}${n.a?`<div class="muted" style="margin-top:6px;font-size:12.5px">${esc(n.a)}</div>`:""}</div>${pjLinks(n)}</details>`).join("")}</div></div>`;
 }
 
+function messagesCard(){
+  const M=(LATEST&&LATEST.messages||[]).slice(0,6); if(!M.length) return "";
+  return `<div class="card"><div class="eyebrow">Messages des profs</div><div class="cdtlist" style="margin-top:10px">${M.map(m=>`<details class="cdt"><summary><span class="date">${fmt(m.d)}</span><span class="ttl">${esc(m.t)}</span>${(m.f||[]).length?`<span class="pill">${m.f.length} doc</span>`:""}</summary><div class="cdtx">${linkify(m.x||"")}<div class="muted" style="margin-top:6px;font-size:12.5px">${esc(m.a)}</div></div>${pjLinks(m)}</details>`).join("")}</div></div>`;
+}
 /* ============ SUIVI ============ */
 function vSuivi(){
   const name=QG.base.NAME||"l'élève"; const p=LATEST&&LATEST.progress;
@@ -675,6 +681,7 @@ function vRecherche(){
   add("Devoirs",CDT.taf.filter(w=>hit(w.x+" "+(SUBJ[w.s]||{}).n)).sort((a,b)=>b.due.localeCompare(a.due)),w=>`<li><span class="date">pour ${fmt(w.due)}</span><div style="min-width:0">${chip(w.s)} <a href="#fiches/${FICHES[w.s]?w.s:"maths"}/taf">voir</a><div class="muted">${snippet(w.x,words)}</div></div></li>`);
   add("Exercices",Object.keys(EX).flatMap(s=>EX[s].map((x,i)=>({s,i,x}))).filter(o=>hit(o.x.t+" "+strip(o.x.q))),o=>`<li><div style="min-width:0">${lk("ex:"+o.s+":"+o.i)}<div class="muted">${snippet(strip(o.x.q),words)}</div></div></li>`);
   add("Cartes mémoire",Object.keys(CARDS).flatMap(s=>CARDS[s].map((c,i)=>({s,c}))).filter(o=>hit(o.c[0]+" "+o.c[1])),o=>`<li><div style="min-width:0">${chip(o.s)} <a href="#cartes/${o.s}">${esc(o.c[0])}</a><div class="muted">${esc(o.c[1])}</div></div></li>`);
+  add("Messages des profs",(LATEST&&LATEST.messages||[]).filter(m=>hit(m.t+" "+m.x+" "+m.a+" "+(m.f||[]).map(f=>f.n).join(" "))),m=>`<li><span class="date">${fmt(m.d)}</span><div style="min-width:0"><b>${esc(m.t)}</b> <span class="muted">${esc(m.a)}</span><div class="muted">${snippet(m.x,words)}</div>${pjLinks(m)}</div></li>`);
   add("Infos du collège",(LATEST&&LATEST.news||[]).filter(n=>hit(n.t+" "+n.x)),n=>`<li><span class="date">${fmt(n.d)}</span><div style="min-width:0"><b>${esc(n.t)}</b><div class="muted">${snippet(n.x,words)}</div></div></li>`);
   return `<div class="card"><h2 style="font-size:22px">Résultats pour « ${esc(rq)} »</h2></div>${G.join("")||`<div class="card"><p class="muted" style="margin:0">Rien trouvé. Essaie un autre mot, ou moins de mots.</p></div>`}`;
 }

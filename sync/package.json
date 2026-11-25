@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "sync": "node sync.mjs"
+    "sync": "node sync.mjs",
+    "postinstall": "node patch-pawnote.mjs"
   },
   "dependencies": {
     "html-entities": "2.6.0",

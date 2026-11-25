@@ -1,12 +1,24 @@
-// Correctif pawnote pour PRONOTE 2026 : la page de démarrage s'écrit maintenant
-// « Start ({...}) ; } catch » au lieu de « Start ({...})} catch ».
+// Rend la lecture des « Informations » Pronote tolérante (champs absents dans PRONOTE 2026),
+// sans rien changer d'autre dans la bibliothèque. Idempotent.
 import fs from "node:fs";
-const files = ["node_modules/pawnote/dist/index.mjs", "node_modules/pawnote/dist/index.js"];
-const OLD = '")}catch"', NEW = '")"+(e.includes(");}catch")?";":"")+"}catch"';
-for (const f of files) {
+const MARK = "/*qg-news-patch*/";
+for (const f of ["node_modules/@blockshub/pawnote-lts/dist/index.mjs", "node_modules/@blockshub/pawnote-lts/dist/index.js"]) {
   if (!fs.existsSync(f)) continue;
   let s = fs.readFileSync(f, "utf8");
-  if (s.includes(NEW)) { console.log("pawnote déjà corrigé :", f); continue; }
-  if (s.split(OLD).length !== 2) throw new Error("Correctif pawnote impossible (version inattendue) : " + f);
-  fs.writeFileSync(f, s.replace(OLD, NEW)); console.log("pawnote corrigé :", f);
+  if (s.includes(MARK)) { console.log("déjà corrigé :", f); continue; }
+  const a = s.indexOf("category:s.find(s=>s.id===e.categorie.V.N)"), p = s.indexOf('"PageActualites"');
+  if (a < 0 || p < 0) { console.log("⚠ correctif Informations non appliqué (version inattendue) :", f); continue; }
+  const start = s.lastIndexOf("=>({id:e.N,title:e.L,", a) - 10, end = p + 900;
+  let w = s.slice(start, end);
+  w = w.replace("e.listeModesAff[0].listeActualites.V.map(", "(e.listeModesAff?.[0]?.listeActualites?.V??[]).map(")
+       .replace("e.listeQuestions.V[0]", "((e.listeQuestions?.V??[])[0]??{})")
+       .replace(/content:e\.texte\.V/g, 'content:(e.texte?.V??(typeof e.texte==="string"?e.texte:""))')
+       .replace(/e\.categorie\.V\.N/g, "e.categorie?.V?.N")
+       .replace(/le\(e\.(\w+)\.V\)/g, "(e.$1?.V?le(e.$1.V):void 0)")
+       .replace(/e\.public\.V/g, "e.public?.V")
+       .replace(/e\.reponse\.V\./g, "e.reponse?.V?.")
+       .replace(/(e(?:\.\w+)+)\.V\.map\(/g, "($1?.V??[]).map(")
+       .replace(/if\(!e\.estSondage\)throw new \w+\("decodeNews"\);/, "if(!e.estSondage)return null;");
+  s = s.slice(0, start) + w + s.slice(end) + "\n" + MARK;
+  fs.writeFileSync(f, s); console.log("Informations Pronote : lecture tolérante activée :", f);
 }

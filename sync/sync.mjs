@@ -88,7 +88,7 @@ if (session) {
   try {
     const y = NOW.getMonth() >= 7 ? NOW.getFullYear() : NOW.getFullYear() - 1;
     raw = await P.fetchAll(session, { from: new Date(Date.UTC(y, 7, 20)), to: new Date(+NOW + 42 * 864e5), ttFrom: new Date(+NOW - 864e5), ttTo: new Date(+NOW + 15 * 864e5), log });
-    log(`Pronote : ${raw.assignments.length} devoirs, ${raw.resources.length} séances, ${raw.grades.length} notes, ${raw.lessons.length} cours, ${raw.news.length} infos`);
+    log(`Pronote : ${raw.assignments.length} devoirs, ${raw.resources.length} séances, ${raw.grades.length} notes, ${raw.lessons.length} cours, ${raw.news.length} infos, ${(raw.messages || []).length} messages de profs`);
     if (raw.errors.length) syncErr = "Partiel : " + raw.errors.join(" ; ");
   } catch (e) { raw = null; syncErr = "Lecture de Pronote impossible : " + (e.message || e); log("⚠ " + (e.stack || e)); }
 }
@@ -115,6 +115,7 @@ if (raw && session) {
   for (const a of raw.assignments) for (const x of a.attachments) all.push([x, a.subject, parisDate(a.deadline)]);
   for (const r of raw.resources) for (const c of r.contents) for (const x of c.files) all.push([x, r.subject, parisDate(r.start)]);
   for (const n of raw.news) for (const x of n.attachments || []) all.push([x, "", n.date ? parisDate(n.date) : ""]);
+  for (const m of raw.messages || []) for (const x of m.attachments || []) all.push([x, "MSG:" + m.author, m.date ? parisDate(m.date) : ""]);
   for (const g of raw.grades) for (const x of [g.correction, g.subjectFile]) if (x) all.push([x, g.subject, parisDate(g.date)]);
   let got = 0, bytes = 0, failed = 0;
   for (const [a, subj, ctx] of all) {

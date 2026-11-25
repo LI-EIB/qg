@@ -22,6 +22,8 @@ export function buildMessages(events, base, name) {
     (l) => ({ to: both, tag: "edt", title: `${l.length} changements d'emploi du temps`, body: l.map((e) => `${sname(base, e.s, e.sn)} ${frDay(e.date)}`).join(" · "), url: "#aujourdhui" }));
   group(by("news"), (e) => ({ to: both, tag: "info", title: `Info du collège : ${e.t}`, body: e.a, url: "#aujourdhui" }),
     (l) => ({ to: both, tag: "info", title: `${l.length} informations du collège`, body: l.map((e) => e.t).join(" · "), url: "#aujourdhui" }));
+  group(by("msg"), (e) => ({ to: both, tag: "msg", title: `Message de ${e.a}`, body: e.t + (e.n ? ` · ${e.n} document${e.n > 1 ? "s" : ""} joint${e.n > 1 ? "s" : ""}` : ""), url: "#aujourdhui" }),
+    (l) => ({ to: both, tag: "msg", title: `${l.length} nouveaux messages des profs`, body: [...new Set(l.map((e) => e.a))].join(", "), url: "#aujourdhui" }));
   const c = by("cdt");
   if (c.length) out.push({ to: ["lehna"], tag: "cdt", title: "Nouveau dans le cahier de textes", body: cut([...new Set(c.map((e) => sname(base, e.s)))].join(", ") + " : " + c.map((e) => e.title).join(" · "), 160), url: `#fiches/${c[0].s}/cdt` });
   return out;

@@ -153,6 +153,18 @@ export function transform(raw, base, files, seen, now) {
     return x;
   }).sort((a, b) => b.d.localeCompare(a.d));
 
+  // ---------- messages des profs (avec leurs documents) ----------
+  const profSubj = {};
+  for (const l of raw.lessons || []) for (const t of l.teachers || []) { const k = String(t).toUpperCase().split(/\s+/)[0]; if (k && !profSubj[k]) profSubj[k] = subjKey(l.subject); }
+  for (const [k, v] of Object.entries(base.SUBJ || {})) { const sur = String(v.prof || "").replace(/^(M\.|Mme|Mlle)\s*/i, "").toUpperCase().split(/\s+/)[0]; if (sur && !profSubj[sur]) profSubj[sur] = k; }
+  const subjOfAuthor = (a) => { for (const w of String(a || "").toUpperCase().replace(/^(M\.|MME|MLLE)\s*/, "").split(/[\s.,]+/)) if (profSubj[w]) return profSubj[w]; return "autre"; };
+  const messages = (raw.messages || []).filter((m) => m.date && parisDate(m.date) >= addDays(today, -150)).map((m) => {
+    const d = parisDate(m.date), s = subjOfAuthor(m.author);
+    const x = { id: sid("m", d, m.author, m.subject, m.content), d, s, t: m.subject || "Message", a: m.author, x: cut(htmlToText(m.content), 2000), f: (m.attachments || []).map((a) => fref(a, "MSG:" + m.author, d)) };
+    if (firstSeen("msg", x.id, d)) ev.push({ type: "msg", s, t: x.t, a: x.a, n: x.f.length });
+    return x;
+  }).sort((a, b) => b.d.localeCompare(a.d));
+
   // ---------- contrôles annoncés (boss automatiques) ----------
   const cand = {};
   const addCand = (s, date, o) => {
@@ -239,7 +251,7 @@ export function transform(raw, base, files, seen, now) {
   return {
     content: {
       v: 2, student: raw.student, holidays, yearStart: raw.yearStart && parisDate(raw.yearStart),
-      devoirs, cdtFull: { cdt, taf }, edt, notes, averages, overall, bosses, missions, revs, changes, news,
+      devoirs, cdtFull: { cdt, taf }, edt, messages, notes, averages, overall, bosses, missions, revs, changes, news,
     },
     events: ev,
   };

@@ -109,15 +109,15 @@ function vAujourdhui(){
 }
 let selDay=null;
 function vPlanning(){
-  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour d'évaluation · « prête ! » = objectif atteint 2 jours avant. Chaque case montre la mission et les devoirs Pronote à faire ce soir-là pour le lendemain. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
+  const start=(()=>{const t=dObj(TODAY); t.setDate(t.getDate()-((t.getDay()+6)%7)-7); const f=dObj(MISSIONS[0].date); f.setDate(f.getDate()-((f.getDay()+6)%7)); return t<f?f:t;})(); let html=`<div class="card"><h2 style="font-size:22px">Le planning sur 5 semaines</h2><p class="muted" style="margin:6px 0 0">Touche une case pour voir la mission et ses liens (fiche, PDF, exercices). Cadre rouge = jour d'évaluation · <b class="ecelegend">orange = ECE (épreuves communes) et leurs révisions</b> · « prête ! » = objectif atteint 2 jours avant. Chaque case montre la mission et les devoirs Pronote à faire ce soir-là pour le lendemain. Les nouveaux contrôles annoncés sur Pronote ajoutent leurs révisions tout seuls.</p></div><div class="cal">`;
   ["LUN","MAR","MER","JEU","VEN","SAM","DIM"].forEach(h=>html+=`<div class="hd">${h}</div>`);
   for(let w=0;w<5;w++){
     {const m0=new Date(start); m0.setDate(start.getDate()+w*7); const m6=new Date(m0); m6.setDate(m0.getDate()+6); const pw=iso(m6)<TODAY; html+=`<div class="weekhead ${pw?"past":""}">Semaine du ${m0.getDate()} ${MO[m0.getMonth()]} au ${m6.getDate()} ${MO[m6.getMonth()]}${pw?" <span class=\"wtag\">passée</span>":(iso(m0)<=TODAY?" <span class=\"wtag now\">cette semaine</span>":"")}</div>`;}
     for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+w*7+i);const s=iso(d);const m=MISSIONS.find(x=>x.date===s);
       if(!m){html+=`<div class="day empty ${s<TODAY?"past":""}" style="${sc("autre")}"><span class="d">${fmt(s)}</span><span class="s">${holidayOf(s)?"Vacances":"Libre"}</span></div>`;continue;}
       const b=m.boss&&bossById(m.boss), r=m.ready&&bossById(m.ready);
-      html+=`<button class="day ${b?"isboss":""} ${s===TODAY?"today":""} ${state.done[s]?"done":""} ${s<TODAY?"past":""} ${s===(selDay||TODAY)?"sel":""}" style="${sc(m.subj)}" data-day="${s}" aria-label="${fmtLong(s)} : ${esc(m.title)}">
-        <span class="d">${fmt(s)}</span>${b?`<span class="tag">ÉVAL. ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span>${(()=>{const n=devoirsSoir(s).list.length; return n?`<span class="dv">+ ${n} devoir${n>1?"s":""} pour ${fmt(nextClassDay(s)).split(" ")[0]}</span>`:"";})()}</button>`;}
+      const ece=isEce(m), eceJ=m.boss&&isEceBoss(bossById(m.boss)); html+=`<button class="day ${b?"isboss":""} ${eceJ?"ecejour":ece?"ece":""} ${s===TODAY?"today":""} ${state.done[s]?"done":""} ${s<TODAY?"past":""} ${s===(selDay||TODAY)?"sel":""}" style="${sc(m.subj)}" data-day="${s}" aria-label="${fmtLong(s)} : ${esc(m.title)}">
+        <span class="d">${fmt(s)}</span>${eceJ?`<span class="tag ecetag">JOUR DES ECE</span>`:ece?`<span class="tag ecetag">RÉVISION ECE</span>`:""}${b&&!eceJ?`<span class="tag">ÉVAL. ${esc(SUBJ[b.subj].n.split(" ")[0])}</span>`:""}<span class="s">${SUBJ[m.subj]?SUBJ[m.subj].n.split(" (")[0]:""}</span>${r?`<span class="tag r">prête !</span>`:""}<span class="t">${esc(m.title)}</span>${(()=>{const n=devoirsSoir(s).list.length; return n?`<span class="dv">+ ${n} devoir${n>1?"s":""} pour ${fmt(nextClassDay(s)).split(" ")[0]}</span>`:"";})()}</button>`;}
   }
   html+=`</div>`;
   html+=soirCard(selDay||TODAY,false);
@@ -346,6 +346,9 @@ function bossPrep(b){ if(!b.date) return {done:0,total:0};
   const from=iso(new Date(dObj(b.date).getTime()-7*864e5));
   const L=MISSIONS.filter(m=>m.date<b.date&&m.date>=from&&(m.subj===b.subj||m.ready===b.id)&&m.date<=TODAY);
   return {done:L.filter(m=>state.done[m.date]).length,total:L.length}; }
+/* ECE : épreuves communes, mises en évidence dans le planning */
+const isEceBoss=b=>!!b&&(/ECE|épreuves? communes?/i.test(b.title||"")||b.id==="ece");
+const isEce=m=>!!m&&(/\bECE\b/.test(m.title||"")||isEceBoss(bossById(m.ready))||isEceBoss(bossById(m.boss)));
 /* ============ DEVOIRS DU SOIR DANS LE PLANNING ============ */
 /* Le soir, on fait d'abord les devoirs du prochain jour de classe, puis la mission.
    Vendredi : rien (les devoirs de lundi sont prévus le week-end). */

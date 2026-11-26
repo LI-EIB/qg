@@ -101,10 +101,11 @@ export async function fetchAll(session, r) {
       const g = await pronote.gradesOverview(session, p);
       for (const x of g.grades) out.grades.push({
         id: x.id, period: p.name, date: iso(x.date), subject: x.subject.name, comment: x.comment || "",
-        value: x.value, outOf: x.outOf, average: x.average || null, coefficient: x.coefficient,
+        value: x.value, outOf: x.outOf, average: x.average || null, coefficient: x.coefficient, bonus: !!x.isBonus, optional: !!x.isOptional, outOf20: x.isOutOf20 !== false, subjectId: x.subject.id || "",
         correction: x.correctionFile ? att(x.correctionFile) : null, subjectFile: x.subjectFile ? att(x.subjectFile) : null,
       });
-      out.averages = g.subjectsAverages.map((a) => ({ subject: a.subject.name, student: a.student || null, classAverage: a.class_average || null, outOf: a.outOf || null }));
+      r.log(`Moyennes Pronote (${p.name}) : ${(g.subjectsAverages || []).filter((a) => a.student).length} matière(s) avec moyenne, générale ${g.overallAverage ? "fournie" : "non fournie"}`);
+      out.averages = (g.subjectsAverages || []).map((a) => ({ subject: a.subject.name, student: a.student || null, classAverage: a.class_average || null, outOf: a.outOf || null }));
       out.overall = { student: g.overallAverage || null, classAverage: g.classAverage || null, period: p.name };
     }
   });

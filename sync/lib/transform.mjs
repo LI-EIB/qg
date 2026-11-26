@@ -116,12 +116,48 @@ export function transform(raw, base, files, seen, now) {
     notes.push([parisDate(g.date), s, g.comment || "Évaluation", v, o, pts(g.average)]);
   }
   notes.sort((a, b) => b[0].localeCompare(a[0]));
-  const averages = {};
+  // Moyennes : celles de Pronote si elles sont fournies, sinon calculées comme Pronote
+  // (notes ramenées sur 20, pondérées par leur coefficient ; bonus et notes facultatives).
+  // Moyenne générale = moyenne des moyennes de chaque matière (comme l'appli Pronote).
+  const subjAvg = (list, pick) => {
+    const L = list.map((g) => ({ v: pick(g), o: pts(g.outOf), c: typeof g.coefficient === "number" ? g.coefficient : 1, g })).filter((x) => x.v != null && x.o && x.c > 0);
+    if (!L.length) return null;
+    const on20 = L.every((x) => x.g.outOf20 !== false);
+    const calc = (arr) => {
+      const base = arr.filter((x) => !x.g.bonus);
+      if (!base.length) return null;
+      let m = on20 ? base.reduce((t, x) => t + (x.v / x.o) * 20 * x.c, 0) / base.reduce((t, x) => t + x.c, 0)
+                   : (base.reduce((t, x) => t + x.v * x.c, 0) / base.reduce((t, x) => t + x.o * x.c, 0)) * 20;
+      const W = base.reduce((t, x) => t + x.c, 0);
+      for (const x of arr.filter((x) => x.g.bonus)) { const b = (x.v / x.o) * 20 - 10; if (b > 0) m += (b * x.c) / W; }
+      return Math.min(20, m);
+    };
+    let keep = L.filter((x) => !x.g.optional), m = calc(keep);
+    for (const x of L.filter((x) => x.g.optional)) { const t = calc([...keep, x]); if (m == null || (t != null && t > m)) { keep = [...keep, x]; m = t; } }
+    return m;
+  };
+  const bySubj = new Map();
+  for (const g of raw.grades || []) { const k = g.subject; if (!bySubj.has(k)) bySubj.set(k, []); bySubj.get(k).push(g); }
+  const pron = new Map();
   for (const a of raw.averages || []) {
-    const s = subjKey(a.subject); const o = pts(a.outOf) || 20; const st = pts(a.student), cl = pts(a.classAverage);
-    if (st != null) averages[s] = { e: +(st / o * 20).toFixed(2), c: cl != null ? +(cl / o * 20).toFixed(2) : null };
+    const o = pts(a.outOf) || 20; const st = pts(a.student), cl = pts(a.classAverage);
+    if (st != null) pron.set(a.subject, { e: (st / o) * 20, c: cl != null ? (cl / o) * 20 : null });
   }
-  const overall = raw.overall && pts(raw.overall.student) != null ? { e: pts(raw.overall.student), c: pts(raw.overall.classAverage), p: raw.overall.period } : null;
+  const averages = {}; const perSubject = [];
+  for (const name of new Set([...bySubj.keys(), ...pron.keys()])) {
+    const P = pron.get(name), G = bySubj.get(name) || [];
+    const e = P ? P.e : subjAvg(G, (g) => pts(g.value));
+    if (e == null) continue;
+    const c = P && P.c != null ? P.c : subjAvg(G, (g) => pts(g.average));
+    perSubject.push({ e, c });
+    const s = subjKey(name);
+    if (!averages[s]) averages[s] = { e: +e.toFixed(2), c: c != null ? +c.toFixed(2) : null, src: P ? "pronote" : "calcul" };
+  }
+  const mean = (arr) => (arr.length ? arr.reduce((t, x) => t + x, 0) / arr.length : null);
+  const period = (raw.overall && raw.overall.period) || ((raw.grades || [])[0] || {}).period || "";
+  const ovE = raw.overall && pts(raw.overall.student) != null ? pts(raw.overall.student) : mean(perSubject.map((x) => x.e));
+  const ovC = raw.overall && pts(raw.overall.classAverage) != null ? pts(raw.overall.classAverage) : mean(perSubject.filter((x) => x.c != null).map((x) => x.c));
+  const overall = ovE != null ? { e: +ovE.toFixed(2), c: ovC != null ? +ovC.toFixed(2) : null, p: period, n: perSubject.length } : null;
 
   // ---------- vacances ----------
   const holidays = (raw.holidays || []).map((h) => ({ n: h.name, start: parisDate(h.start), end: parisDate(h.end) }));

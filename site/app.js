@@ -284,14 +284,16 @@ function vCartes(){
 function vNotes(){
   const A=(LATEST&&LATEST.averages)||{}, O=LATEST&&LATEST.overall;
   const by={}; NOTES.forEach(n=>{(by[n[1]]=by[n[1]]||[]).push(n);});
-  const all=NOTES.map(n=>n[3]/n[4]*20), gen=O&&O.e!=null?O.e:all.reduce((a,b)=>a+b,0)/Math.max(1,all.length);
-  const f1=x=>x.toFixed(1).replace(".",",");
+  const f1=x=>x.toFixed(2).replace(".",",");
+  const sm=Object.keys(by).map(s=>A[s]?A[s].e:by[s].reduce((t,n)=>t+n[3]/n[4]*20,0)/by[s].length);
+  const gen=O&&O.e!=null?O.e:sm.reduce((a,b)=>a+b,0)/Math.max(1,sm.length);
+  const srcP=Object.values(A).some(a=>a.src!=="calcul");
   const cards=Object.keys(by).map(s=>{const L=by[s].sort((a,b)=>b[0].localeCompare(a[0])); const gl=L.filter(n=>n[5]!=null);
     const m=A[s]?A[s].e:L.reduce((t,n)=>t+n[3]/n[4]*20,0)/L.length, g=A[s]&&A[s].c!=null?A[s].c:(gl.length?gl.reduce((t,n)=>t+n[5]/n[4]*20,0)/gl.length:null);
     return {s,m,html:`<div class="card ncard" style="${sc(s)}"><div class="row" style="justify-content:space-between">${chip(s)}${g!=null?`<span class="muted" style="font-size:12.5px">groupe ${f1(g)}</span>`:""}</div>
     <div class="avg ${g==null||m>=g?"up":"down"}">${f1(m)}<span class="muted" style="font-size:15px"> /20</span></div>
     ${L.map(n=>`<div class="nline"><span>${fmt(n[0])} · ${esc(n[2])}</span><b class="${n[5]==null?"":n[3]>=n[5]?"up":"down"}">${String(n[3]).replace(".",",")}/${n[4]}</b></div>`).join("")}</div>`};}).sort((a,b)=>a.m-b.m);
-  return `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="font-size:22px">Mes notes${O&&O.p?" · "+esc(O.p):""}</h2><p class="muted" style="margin:4px 0 0">${A&&Object.keys(A).length?"Moyennes calculées par Pronote.":"Moyennes indicatives, sans les coefficients."} En vert : au-dessus de la moyenne du groupe. Les matières à renforcer sont en premier.</p></div><div style="text-align:right"><div class="eyebrow">Moyenne générale</div><div class="avg">${f1(gen)}</div></div></div></div>
+  return `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="font-size:22px">Mes notes${O&&O.p?" · "+esc(O.p):""}</h2><p class="muted" style="margin:4px 0 0">${A&&Object.keys(A).length?(srcP?"Moyennes données par Pronote.":"Moyennes calculées comme sur Pronote : notes ramenées sur 20, avec leurs coefficients. La moyenne générale est la moyenne des matières."):"Moyennes indicatives, sans les coefficients."} En vert : au-dessus de la moyenne du groupe. Les matières à renforcer sont en premier.</p></div><div style="text-align:right"><div class="eyebrow">Moyenne générale</div><div class="avg">${f1(gen)}</div>${O&&O.c!=null?`<div class="muted" style="font-size:12.5px">classe ${f1(O.c)}</div>`:""}</div></div></div>
   <div class="notes">${cards.map(c=>c.html).join("")}</div>`;
 }
 
@@ -405,7 +407,7 @@ function vSuivi(){
     return `<li><span class="date">${fmt(b.date)}</span><div style="min-width:0">${chip(b.subj)}<div class="txt" style="margin-top:4px">${esc(b.title)}</div></div><b class="res">${prep.length?ok+"/"+prep.length+" révisions":"—"}</b></li>`;}).join("")||"<li>Aucun contrôle annoncé pour l'instant.</li>";
   const decks=Object.keys(CARDS).map(s=>{const t=CARDS[s].length, ok=CARDS[s].filter((c,i)=>state.cards[s+":"+i]===1).length; return `<div class="nline"><span>${chip(s)}</span><b>${ok}/${t}</b></div>`;}).join("");
   const av=LATEST&&LATEST.averages||{}; const weak=Object.entries(av).filter(([s,a])=>a.c!=null&&SUBJ[s]).sort((a,b)=>(a[1].e-a[1].c)-(b[1].e-b[1].c)).slice(0,3)
-    .map(([s,a])=>`<div class="nline"><span>${chip(s)}</span><b class="${a.e>=a.c?"up":"down"}">${String(a.e.toFixed(1)).replace(".",",")} <span class="muted" style="font-weight:600">(groupe ${String(a.c.toFixed(1)).replace(".",",")})</span></b></div>`).join("");
+    .map(([s,a])=>`<div class="nline"><span>${chip(s)}</span><b class="${a.e>=a.c?"up":"down"}">${String(a.e.toFixed(2)).replace(".",",")} <span class="muted" style="font-weight:600">(groupe ${String(a.c.toFixed(2)).replace(".",",")})</span></b></div>`).join("");
   return `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="font-size:22px">Suivi de ${esc(name)}</h2><p class="muted" style="margin:4px 0 0">${ROLE==="parent"?(last?"Dernière activité dans le QG : "+fmtLong(iso(last))+" à "+pad(last.getHours())+"h"+pad(last.getMinutes()):"Pas encore d'activité reçue depuis l'ordinateur de "+esc(name)+"."):"Ce que voient aussi tes parents."}</p></div>
    <div style="text-align:right"><div class="eyebrow">Rubis</div><div class="avg">${xp()}</div><div class="muted" style="font-size:13px">série : ${streak()} j</div></div></div></div>
   <div class="grid2"><div style="display:grid;gap:18px;align-content:start;min-width:0">

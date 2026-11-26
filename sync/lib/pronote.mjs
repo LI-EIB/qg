@@ -96,8 +96,11 @@ export async function fetchAll(session, r) {
     const tab = res.tabs.get(pronote.TabLocation.Grades);
     const now = Date.now();
     const periods = (tab?.periods || []).filter((p) => +p.startDate <= now);
-    const pick = periods.filter((p) => +p.endDate >= now);
-    for (const p of (pick.length ? pick : periods.slice(-1))) {
+    // La période en cours la plus courte (ex. « Semestre 1 »), pas « Hors période » ni l'année entière :
+    // c'est celle que Pronote affiche par défaut et qui porte les moyennes.
+    const cur = periods.filter((p) => +p.endDate >= now).sort((a, b) => (+a.endDate - +a.startDate) - (+b.endDate - +b.startDate) || (/hors/i.test(a.name) ? 1 : 0) - (/hors/i.test(b.name) ? 1 : 0));
+    r.log("Périodes de notes : " + (tab?.periods || []).map((p) => p.name).join(", ") + (cur[0] ? " → " + cur[0].name : ""));
+    for (const p of (cur.length ? [cur[0]] : periods.slice(-1))) {
       const g = await pronote.gradesOverview(session, p);
       for (const x of g.grades) out.grades.push({
         id: x.id, period: p.name, date: iso(x.date), subject: x.subject.name, comment: x.comment || "",

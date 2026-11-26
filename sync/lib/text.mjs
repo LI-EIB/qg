@@ -7,9 +7,10 @@ const EXACT = {
   "ARTS PLASTIQUES": "arts", "CHINOIS LV2": "chinois", "EDUCATION MUSICALE": "musique",
   "FRANCAIS": "francais", "HISTOIRE - SI": "hsi", "HISTOIRE ET GEOGRAPHIE EN FRANCAIS": "hg",
   "LANGUE & LITTERATURE BRITANNIQUE": "anglais", "MATHEMATIQUES": "maths", "PHYSIQUE-CHIMIE": "pc",
-  "SVT": "svt", "TECHNOLOGIE": "techno",
+  "SVT": "svt", "TECHNOLOGIE": "techno", "EDUCATION PHYSIQUE ET SPORTIVE": "eps",
 };
 const RULES = [
+  [/\bEPS\b|SPORT|EDUCATION PHYSIQUE/, "eps"],
   [/HISTOIRE\s*-\s*SI|\bHSI\b|SECTION INTERNATIONALE/, "hsi"],
   [/MATH/, "maths"], [/FRANC/, "francais"], [/BRITANN|ANGLAIS|ENGLISH|\bLLB\b|LITT/, "anglais"],
   [/HIST|GEOG/, "hg"], [/\bSVT\b|SCIENCES DE LA VIE|VIE ET DE LA TERRE/, "svt"], [/PHYS|CHIMIE/, "pc"],
